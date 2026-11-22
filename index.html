@@ -50,9 +50,11 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .hud-button{position:absolute;top:var(--hud-row);z-index:2;min-height:40px;padding:0 10px;font-size:12px;color:#ced8dc}
 .fast-mode{right:var(--hud-right)}
 .fullscreen{left:var(--hud-left)}
-.item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 17px) var(--hud-left);z-index:2;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;pointer-events:none}
+.item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 76px) var(--hud-left);z-index:2;pointer-events:none}
 .item-status[hidden]{display:none}
-.item-status span{padding:5px 8px;border-radius:6px;background:#151a22e8;color:#eee3c9;font-size:12px}
+.item-turn,.item-effect{padding:5px 8px;border-radius:6px;background:#151a22f2;color:#eee3c9;font-size:12px}
+.item-turn{position:absolute;right:0;top:calc(100% + 32px)}
+.item-effect{position:absolute;top:100%;left:0;width:min(245px,100%);margin:4px 0 0;line-height:1.4;pointer-events:auto}
 .item-status button{pointer-events:auto;white-space:normal}
 .hud-button[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
 .fullscreen-status{position:absolute;top:calc(var(--hud-row) + 46px);left:var(--hud-left);max-width:calc(100% - var(--hud-left) - var(--hud-right));z-index:3;margin:0;padding:6px 9px;border-radius:8px;background:#121a24ee;font-size:12px;pointer-events:none}
@@ -82,8 +84,9 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <div class="fighter red"><div class="fighter-head"><span class="name">칸타의 팽이</span><span id="redHp" class="hp">100 HP</span></div><div class="track"><div id="redFill" class="fill"></div></div></div>
   </section>
   <div id="itemStatus" class="item-status" hidden>
-    <button id="useItem" type="button">아이템 없음</button>
-    <span id="enemyItem" aria-live="polite"></span>
+    <button id="useItem" type="button" aria-expanded="false" aria-controls="itemEffect">아이템 없음</button>
+    <p id="itemEffect" class="item-effect" hidden></p>
+    <span id="itemTurn" class="item-turn"></span>
   </div>
   <div id="tutorialIntro" class="tutorial" hidden>
     <div class="tutorial-copy"><strong id="tutorialIntroText" aria-live="polite">이것은 교주의 팽이입니다</strong></div>
@@ -105,7 +108,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.65</span>
+  <span class="version">v0.66</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -136,7 +139,8 @@ const shotClock = document.querySelector('#shotClock');
 const shotSeconds = document.querySelector('#shotSeconds');
 const itemStatus = document.querySelector('#itemStatus');
 const useItemButton = document.querySelector('#useItem');
-const enemyItemStatus = document.querySelector('#enemyItem');
+const itemEffect = document.querySelector('#itemEffect');
+const itemTurn = document.querySelector('#itemTurn');
 const resultProgress = document.querySelector('#resultProgress');
 const tutorialIntro = document.querySelector('#tutorialIntro');
 const tutorialIntroText = document.querySelector('#tutorialIntroText');
@@ -243,7 +247,7 @@ function resetRound(started = false) {
     elapsed: 0, started, enemyDashUntil: 0,
     playerDashUntil: 0, nextStrike: 0, shotTime: started && !tutorial ? SHOT_WINDOW : null,
     over: false, freeze: 0, shake: 0,
-    turn: 1, resolvingTurn: false, fieldItem: null, nextItemTurn: ITEM_INTERVAL, armedItem: null
+    turn: 1, resolvingTurn: false, fieldItem: null, nextItemTurn: ITEM_INTERVAL, armedItem: null, itemDetailsOpen: false
   };
   sparks = [];
   hits = [];
@@ -414,17 +418,18 @@ function chooseEnemyAction(enemy, weakSideMove, opponentDistance) {
 
 function updateItemHud() {
   itemStatus.hidden = Boolean(tutorial) || !round.started || round.over;
-  const [player, enemy] = tops;
+  const [player] = tops;
   const playerItem = ITEMS[player.item];
-  const enemyItem = ITEMS[enemy.item];
   const armed = round.armedItem !== null;
+  const expanded = Boolean(playerItem) && round.itemDetailsOpen;
   useItemButton.textContent = player.effect ? ITEMS[player.effect].name + ' 적용 중'
     : armed ? playerItem.name + ' 사용 예약 · 취소'
     : playerItem ? playerItem.name + ' 사용' : '아이템 없음';
-  useItemButton.title = playerItem?.description ?? '';
+  useItemButton.setAttribute('aria-expanded', String(expanded));
   useItemButton.setAttribute('aria-pressed', String(armed));
-  const enemyState = enemy.effect ? ITEMS[enemy.effect].name + ' 적용 중' : enemyItem?.name ?? '아이템 없음';
-  enemyItemStatus.textContent = round.turn + '턴 · 칸타 ' + enemyState;
+  itemEffect.hidden = !expanded;
+  itemEffect.textContent = expanded ? playerItem.description : '';
+  itemTurn.textContent = round.turn + '턴';
 }
 
 function spawnItem() {
@@ -606,6 +611,10 @@ function strike(angle, power, timedOut = false) {
   const playerItem = tutorial ? null : round.armedItem;
   const stationary = playerItem === 'A' || playerItem === 'B';
   if (!timedOut && !stationary && power <= 0) return;
+  if (round.itemDetailsOpen) {
+    round.itemDetailsOpen = false;
+    updateItemHud();
+  }
   const playerDash = power > 0 && !stationary ? { angle, speed: playerDashSpeed(power), duration: dashDuration(power) } : null;
   const enemyActive = !tutorial || tutorial.stage === 'combat';
   const weakSideMove = Boolean(playerDash) && isWeakSideMove(player, enemy, angle, power);
@@ -1000,13 +1009,13 @@ function draw() {
     return;
   }
   if (round.fieldItem) {
-    const {x, y, type} = round.fieldItem;
-    oval(x, y, ITEM_RADIUS + 3, ITEM_RADIUS + 3, '#1b222d', ITEMS[type].color, 2);
-    ctx.fillStyle = ITEMS[type].color;
+    const {x, y} = round.fieldItem;
+    oval(x, y, ITEM_RADIUS + 3, ITEM_RADIUS + 3, '#1b222d', '#f9dc91', 2);
+    ctx.fillStyle = '#f9dc91';
     ctx.font = 'bold 19px system-ui';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(type, x, y);
+    ctx.fillText('?', x, y);
     ctx.textBaseline = 'alphabetic';
   }
   tops.forEach(drawTrail);
@@ -1136,13 +1145,32 @@ fastModeButton.addEventListener('click', () => {
 useItemButton.addEventListener('click', () => {
   if (!canStrike() || tutorial || !tops[0].item) return;
   const item = tops[0].item;
-  if (item === 'A' || item === 'B') {
-    round.armedItem = item;
-    gesture = null;
-    strike(0, 0);
+  if (round.armedItem) {
+    round.armedItem = null;
+    updateItemHud();
     return;
   }
-  round.armedItem = round.armedItem === item ? null : item;
+  if (!round.itemDetailsOpen) {
+    round.itemDetailsOpen = true;
+    updateItemHud();
+    return;
+  }
+  round.itemDetailsOpen = false;
+  round.armedItem = item;
+  updateItemHud();
+  if (item === 'A' || item === 'B') {
+    gesture = null;
+    strike(0, 0);
+  }
+});
+document.addEventListener('pointerdown', event => {
+  if (!round.itemDetailsOpen || useItemButton.contains(event.target)) return;
+  round.itemDetailsOpen = false;
+  updateItemHud();
+}, true);
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !round.itemDetailsOpen) return;
+  round.itemDetailsOpen = false;
   updateItemHud();
 });
 tutorialNext.addEventListener('click', () => {
