@@ -105,7 +105,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.64</span>
+  <span class="version">v0.65</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -163,6 +163,7 @@ const TUTORIAL_HITS = 3;
 const PLAYER_STRIKE_INTERVAL = .72;
 const WALL_DAMAGE_SPEED = 180;
 const DODGE_WALL_MARGIN = 18;
+const DODGE_MIN_DISTANCE = RADIUS * 3.5;
 const PLAYER_DASH_DRAG = 1.15;
 const IDLE_DRAG = 5.5;
 const ITEM_INTERVAL = 3;
@@ -378,18 +379,19 @@ function isWeakSideMove(player, enemy, angle, power) {
   return power > 0 && power <= .4 && Math.abs(Math.cos(angle - towardEnemy)) <= .5;
 }
 
-function chooseEnemyMove(weakSideMove) {
-  if (Math.random() >= .5) {
+function chooseEnemyMove(weakSideMove, opponentDistance) {
+  if (opponentDistance >= DODGE_MIN_DISTANCE && Math.random() >= .5) {
     return { tactic: 'dodge', power: random(.05, .23), preferredSide: Math.random() < .5 ? -1 : 1 };
   }
   if (weakSideMove && Math.random() >= .5) return { tactic: 'lead', power: random(.6, .95) };
   return { tactic: 'headOn', power: random(.6, .95) };
 }
 
-function chooseEnemyAction(player, enemy, weakSideMove) {
-  const choices = ['attack', 'dodge'];
+function chooseEnemyAction(enemy, weakSideMove, opponentDistance) {
+  const choices = ['attack'];
+  if (opponentDistance >= DODGE_MIN_DISTANCE) choices.push('dodge');
   if (round.fieldItem) choices.push('pickup');
-  if (enemy.item === 'A' && Math.hypot(player.x - enemy.x, player.y - enemy.y) <= BLAST_RANGE) choices.push('A');
+  if (enemy.item === 'A' && opponentDistance <= BLAST_RANGE) choices.push('A');
   if (enemy.item === 'B' && enemy.hp < MAX_HP) choices.push('B');
   const action = choices[Math.floor(Math.random() * choices.length)];
   if (action === 'A' || action === 'B') return {dash: null, item: action};
@@ -607,9 +609,10 @@ function strike(angle, power, timedOut = false) {
   const playerDash = power > 0 && !stationary ? { angle, speed: playerDashSpeed(power), duration: dashDuration(power) } : null;
   const enemyActive = !tutorial || tutorial.stage === 'combat';
   const weakSideMove = Boolean(playerDash) && isWeakSideMove(player, enemy, angle, power);
+  const opponentDistance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   const action = tutorial
-    ? {move: enemyActive ? chooseEnemyMove(weakSideMove) : null, item:null}
-    : chooseEnemyAction(player, enemy, weakSideMove);
+    ? {move: enemyActive ? chooseEnemyMove(weakSideMove, opponentDistance) : null, item:null}
+    : chooseEnemyAction(enemy, weakSideMove, opponentDistance);
   const enemyDash = action.move ? planEnemyDash(player, enemy, action.move, angle, power) : action.dash;
   const turn = {playerDash, enemyDash, playerItem, enemyItem:action.item};
   round.shotTime = null;
