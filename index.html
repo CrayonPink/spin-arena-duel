@@ -50,6 +50,10 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .hud-button{position:absolute;top:var(--hud-row);z-index:2;min-height:40px;padding:0 10px;font-size:12px;color:#ced8dc}
 .fast-mode{right:var(--hud-right)}
 .fullscreen{left:var(--hud-left)}
+.item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 17px) var(--hud-left);z-index:2;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;pointer-events:none}
+.item-status[hidden]{display:none}
+.item-status span{padding:5px 8px;border-radius:6px;background:#151a22e8;color:#eee3c9;font-size:12px}
+.item-status button{pointer-events:auto;white-space:normal}
 .hud-button[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
 .fullscreen-status{position:absolute;top:calc(var(--hud-row) + 46px);left:var(--hud-left);max-width:calc(100% - var(--hud-left) - var(--hud-right));z-index:3;margin:0;padding:6px 9px;border-radius:8px;background:#121a24ee;font-size:12px;pointer-events:none}
 .fullscreen-status:empty{display:none}
@@ -77,6 +81,10 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" hidden><strong id="shotSeconds">10</strong></div>
     <div class="fighter red"><div class="fighter-head"><span class="name">칸타의 팽이</span><span id="redHp" class="hp">100 HP</span></div><div class="track"><div id="redFill" class="fill"></div></div></div>
   </section>
+  <div id="itemStatus" class="item-status" hidden>
+    <button id="useItem" type="button">아이템 없음</button>
+    <span id="enemyItem" aria-live="polite"></span>
+  </div>
   <div id="tutorialIntro" class="tutorial" hidden>
     <div class="tutorial-copy"><strong id="tutorialIntroText" aria-live="polite">이것은 교주의 팽이입니다</strong></div>
     <div class="tutorial-actions">
@@ -97,7 +105,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.61</span>
+  <span class="version">v0.63</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -126,6 +134,9 @@ const verdict = document.querySelector('#verdict');
 const rematchButton = document.querySelector('#rematch');
 const shotClock = document.querySelector('#shotClock');
 const shotSeconds = document.querySelector('#shotSeconds');
+const itemStatus = document.querySelector('#itemStatus');
+const useItemButton = document.querySelector('#useItem');
+const enemyItemStatus = document.querySelector('#enemyItem');
 const resultProgress = document.querySelector('#resultProgress');
 const tutorialIntro = document.querySelector('#tutorialIntro');
 const tutorialIntroText = document.querySelector('#tutorialIntroText');
@@ -154,6 +165,19 @@ const WALL_DAMAGE_SPEED = 180;
 const DODGE_WALL_MARGIN = 18;
 const PLAYER_DASH_DRAG = 1.15;
 const IDLE_DRAG = 5.5;
+const ITEM_INTERVAL = 3;
+const ITEM_RADIUS = 14;
+const ITEM_SPAWN_GAP = 85;
+const BLAST_RANGE = 110;
+const BLAST_SPEED = 620;
+const TURN_SETTLE_SPEED = 8;
+const ITEMS = {
+  A: {name:'폭발', color:'#ffb180', description:'턴 시작에 가까운 적을 날려보냅니다. 이 턴에 직접 이동할 수 없습니다.'},
+  B: {name:'회복', color:'#abed9d', description:'피해 없이 턴을 끝내면 HP 20 회복. 이 턴에 직접 이동할 수 없습니다.'},
+  C: {name:'벽 보호', color:'#a7deff', description:'적과 충돌하기 전까지 벽 충돌 피해를 받지 않습니다.'},
+  D: {name:'버티기', color:'#e1b9ff', description:'이 턴에는 팽이 충돌과 폭발로 밀려나지 않습니다.'}
+};
+const itemTypes = Object.keys(ITEMS);
 const palette = [
   { light:'#a7efff', bright:'#64d5f4', mid:'#2d97b8', dark:'#174760', name:'교주의 팽이' },
   { light:'#ffceb4', bright:'#ff896b', mid:'#c75942', dark:'#623324', name:'칸타의 팽이' }
@@ -210,14 +234,15 @@ function resetRound(started = false) {
     return {
       color, hp: MAX_HP, x: side * ARENA_RADIUS * .49, y: side * ARENA_RADIUS * .25,
       vx: 0, vy: 0, spin: random(0, TAU), direction: -side, phase: 'idle',
-      stagger: 0, trail: []
+      stagger: 0, trail: [], item: null, effect: null, damaged: false, collided: false
     };
   });
   gesture = null;
   round = {
     elapsed: 0, started, enemyDashUntil: 0,
     playerDashUntil: 0, nextStrike: 0, shotTime: started && !tutorial ? SHOT_WINDOW : null,
-    over: false, freeze: 0, shake: 0
+    over: false, freeze: 0, shake: 0,
+    turn: 1, resolvingTurn: false, fieldItem: null, nextItemTurn: ITEM_INTERVAL, armedItem: null
   };
   sparks = [];
   hits = [];
@@ -228,6 +253,7 @@ function resetRound(started = false) {
   result.hidden = true;
   updateShotClock();
   updateHud();
+  updateItemHud();
 }
 
 function updateHud() {
@@ -242,6 +268,7 @@ function finish() {
   round.over = true;
   gesture = null;
   updateShotClock();
+  updateItemHud();
   const [blue, red] = tops;
   const winner = blue.hp === red.hp ? null : blue.hp > red.hp ? blue : red;
   const won = winner === blue;
@@ -298,7 +325,7 @@ function keepInside(top, duringPlay = false) {
     if (top.phase === 'dash' || top.phase === 'dodge') {
       top.phase = 'idle';
     }
-    if (duringPlay && outward >= WALL_DAMAGE_SPEED) {
+    if (duringPlay && outward >= WALL_DAMAGE_SPEED && !(top.effect === 'C' && !top.collided)) {
       const damage = Math.min(23, Math.round(5 + (outward - WALL_DAMAGE_SPEED) * .028));
       applyDamage(top, damage, top.x, '#ffcf82');
       updateHud();
@@ -314,7 +341,7 @@ function keepInside(top, duringPlay = false) {
 
 function canStrike() {
   return round.started && !round.over && !pendingDash && (!tutorial || tutorial.nextAt === null) && tops.every(top => top.hp > 0)
-    && round.elapsed >= round.nextStrike;
+    && !round.resolvingTurn && round.elapsed >= round.nextStrike;
 }
 
 function updateJoystick(x, y) {
@@ -357,6 +384,125 @@ function chooseEnemyMove(weakSideMove) {
   }
   if (weakSideMove && Math.random() >= .5) return { tactic: 'lead', power: random(.6, .95) };
   return { tactic: 'headOn', power: random(.6, .95) };
+}
+
+function chooseEnemyAction(player, enemy, weakSideMove) {
+  const choices = ['attack', 'dodge'];
+  if (round.fieldItem) choices.push('pickup');
+  if (enemy.item === 'A' && Math.hypot(player.x - enemy.x, player.y - enemy.y) <= BLAST_RANGE) choices.push('A');
+  if (enemy.item === 'B' && enemy.hp < MAX_HP) choices.push('B');
+  const action = choices[Math.floor(Math.random() * choices.length)];
+  if (action === 'A' || action === 'B') return {dash: null, item: action};
+  const item = ((enemy.item === 'C' && action === 'attack') || (enemy.item === 'D' && action !== 'dodge'))
+    && Math.random() >= .5 ? enemy.item : null;
+  if (action === 'pickup') {
+    const {x, y} = round.fieldItem;
+    return {dash: {angle: Math.atan2(y - enemy.y, x - enemy.x), speed: dashSpeed(.75), duration: dashDuration(.75), phase:'dash'}, item};
+  }
+  const move = action === 'dodge'
+    ? {tactic:'dodge', power:random(.05, .23), preferredSide:Math.random() < .5 ? -1 : 1}
+    : {tactic:weakSideMove && Math.random() >= .5 ? 'lead' : 'headOn', power:random(.6, .95)};
+  return {move, item};
+}
+
+function updateItemHud() {
+  itemStatus.hidden = Boolean(tutorial) || !round.started || round.over;
+  const [player, enemy] = tops;
+  const playerItem = ITEMS[player.item];
+  const enemyItem = ITEMS[enemy.item];
+  const armed = round.armedItem !== null;
+  useItemButton.textContent = player.effect ? ITEMS[player.effect].name + ' 적용 중'
+    : armed ? playerItem.name + ' 사용 예약 · 취소'
+    : playerItem ? playerItem.name + ' 사용' : '아이템 없음';
+  useItemButton.title = playerItem?.description ?? '';
+  useItemButton.setAttribute('aria-pressed', String(armed));
+  const enemyState = enemy.effect ? ITEMS[enemy.effect].name + ' 적용 중' : enemyItem?.name ?? '아이템 없음';
+  enemyItemStatus.textContent = round.turn + '턴 · 칸타 ' + enemyState;
+}
+
+function spawnItem() {
+  const radius = WALL_RADIUS - ITEM_RADIUS;
+  const clear = (x, y) => tops.every(top => Math.hypot(top.x - x, top.y - y) >= ITEM_SPAWN_GAP);
+  for (let i = 0; i < 48; i++) {
+    const angle = random(0, TAU);
+    const distance = radius * Math.sqrt(Math.random());
+    const x = Math.cos(angle) * distance;
+    const y = Math.sin(angle) * distance;
+    if (!clear(x, y)) continue;
+    round.fieldItem = {x, y, type:itemTypes[Math.floor(Math.random() * itemTypes.length)]};
+    return;
+  }
+  // Even if random samples miss, try spaced points inside the arena.
+  const offset = random(0, TAU);
+  for (let i = 0; i < 12; i++) {
+    const angle = offset + i * TAU / 12;
+    const x = Math.cos(angle) * radius * .8;
+    const y = Math.sin(angle) * radius * .8;
+    if (!clear(x, y)) continue;
+    round.fieldItem = {x, y, type:itemTypes[Math.floor(Math.random() * itemTypes.length)]};
+    return;
+  }
+}
+
+function itemContactTime(item, start, top) {
+  if (top.hp <= 0) return Infinity;
+  const x = start.x - item.x;
+  const y = start.y - item.y;
+  const dx = top.x - start.x;
+  const dy = top.y - start.y;
+  const gap = x * x + y * y - (RADIUS + ITEM_RADIUS) ** 2;
+  if (gap <= 0) return 0;
+  const speedSquared = dx * dx + dy * dy;
+  const dot = x * dx + y * dy;
+  const discriminant = dot * dot - speedSquared * gap;
+  if (speedSquared === 0 || dot >= 0 || discriminant < 0) return Infinity;
+  const time = (-dot - Math.sqrt(discriminant)) / speedSquared;
+  return time <= 1 ? time : Infinity;
+}
+
+function collectItem(starts) {
+  const item = round.fieldItem;
+  const [first, second] = tops.map((top, i) => itemContactTime(item, starts[i], top));
+  if (!Number.isFinite(Math.min(first, second))) return;
+  const owner = first === second ? tops[Math.random() < .5 ? 0 : 1] : tops[first < second ? 0 : 1];
+  owner.item = item.type;
+  round.fieldItem = null;
+  round.nextItemTurn = round.turn + ITEM_INTERVAL;
+  updateItemHud();
+}
+
+function activateItems(playerItem, enemyItem) {
+  const effects = [playerItem, enemyItem];
+  tops.forEach((top, i) => {
+    const item = effects[i];
+    top.effect = item;
+    top.damaged = top.collided = false;
+    if (!item) return;
+    top.item = null;
+    if (item === 'A' || item === 'B') launch(top, 0, 0, 'idle');
+  });
+  tops.forEach((top, i) => {
+    if (top.effect !== 'A') return;
+    const target = tops[1 - i];
+    const dx = target.x - top.x;
+    const dy = target.y - top.y;
+    if (target.effect !== 'D' && Math.hypot(dx, dy) <= BLAST_RANGE) {
+      launch(target, Math.atan2(dy, dx), BLAST_SPEED, 'idle');
+      target.stagger = .46;
+    }
+    showImpact(top.x, top.y, ITEMS.A.color);
+  });
+  round.armedItem = null;
+  updateItemHud();
+}
+
+function finishTurn() {
+  for (const top of tops) {
+    if (top.effect === 'B' && top.hp > 0 && !top.damaged) top.hp = Math.min(MAX_HP, top.hp + 20);
+    top.effect = null;
+  }
+  round.resolvingTurn = false;
+  updateHud();
 }
 
 function distanceToWall(top, angle) {
@@ -429,7 +575,7 @@ function planEnemyDash(player, enemy, move, playerAngle, playerPower) {
   return { angle: usePreferred ? preferredAngle : otherAngle, speed: Math.min(speed, safeSpeed), duration, phase: 'dodge' };
 }
 
-function releaseDashes(playerDash, enemyDash) {
+function releaseDashes({playerDash, enemyDash, playerItem, enemyItem}) {
   const [player, enemy] = tops;
   if (playerDash) {
     launch(player, playerDash.angle, playerDash.speed);
@@ -441,30 +587,40 @@ function releaseDashes(playerDash, enemyDash) {
     round.enemyDashUntil = round.elapsed + enemyDash.duration;
   }
   round.nextStrike = round.elapsed + PLAYER_STRIKE_INTERVAL;
+  if (!tutorial) {
+    round.resolvingTurn = true;
+    activateItems(playerItem, enemyItem);
+  }
 }
 
 function strike(angle, power, timedOut = false) {
-  if ((!timedOut && power <= 0) || !canStrike()) return;
+  if (!canStrike()) return;
   const [player, enemy] = tops;
-  const playerDash = power > 0 ? { angle, speed: playerDashSpeed(power), duration: dashDuration(power) } : null;
+  const playerItem = tutorial ? null : round.armedItem;
+  const stationary = playerItem === 'A' || playerItem === 'B';
+  if (!timedOut && !stationary && power <= 0) return;
+  const playerDash = power > 0 && !stationary ? { angle, speed: playerDashSpeed(power), duration: dashDuration(power) } : null;
   const enemyActive = !tutorial || tutorial.stage === 'combat';
-  const weakSideMove = isWeakSideMove(player, enemy, angle, power);
-  const enemyMove = enemyActive ? chooseEnemyMove(weakSideMove) : null;
-  const enemyDash = enemyMove ? planEnemyDash(player, enemy, enemyMove, angle, power) : null;
+  const weakSideMove = Boolean(playerDash) && isWeakSideMove(player, enemy, angle, power);
+  const action = tutorial
+    ? {move: enemyActive ? chooseEnemyMove(weakSideMove) : null, item:null}
+    : chooseEnemyAction(player, enemy, weakSideMove);
+  const enemyDash = action.move ? planEnemyDash(player, enemy, action.move, angle, power) : action.dash;
+  const turn = {playerDash, enemyDash, playerItem, enemyItem:action.item};
   round.shotTime = null;
-  if (playerDash && !fastMode && tutorial?.stage !== 'practice') {
-    pendingDash = { playerDash, enemyDash, remaining: PATH_PREVIEW_SECONDS };
+  if ((playerDash || (!tutorial && enemyDash)) && !fastMode && tutorial?.stage !== 'practice') {
+    pendingDash = { ...turn, remaining: PATH_PREVIEW_SECONDS };
   } else {
-    releaseDashes(playerDash, enemyDash);
+    releaseDashes(turn);
   }
   updateShotClock();
 }
 
 function releasePreview() {
-  const { playerDash, enemyDash } = pendingDash;
+  const turn = pendingDash;
   pendingDash = null;
   accumulator = 0;
-  releaseDashes(playerDash, enemyDash);
+  releaseDashes(turn);
 }
 
 function collide() {
@@ -475,28 +631,41 @@ function collide() {
   const ny = separation > .001 ? (b.y - a.y) / separation : 0;
   const playerApproach = a.vx * nx + a.vy * ny;
   const closing = playerApproach - (b.vx * nx + b.vy * ny);
-  const push = (RADIUS * 2 - separation) / 2 + .1;
-  a.x -= nx * push;
-  a.y -= ny * push;
-  b.x += nx * push;
-  b.y += ny * push;
+  const anchoredA = a.effect === 'D';
+  const anchoredB = b.effect === 'D';
+  const push = RADIUS * 2 - separation + .2;
+  if (!anchoredA) {
+    a.x -= nx * push * (anchoredB ? 1 : .5);
+    a.y -= ny * push * (anchoredB ? 1 : .5);
+  }
+  if (!anchoredB) {
+    b.x += nx * push * (anchoredA ? 1 : .5);
+    b.y += ny * push * (anchoredA ? 1 : .5);
+  }
   if (closing <= 0) return;
+  a.collided = b.collided = true;
   const wasDodging = b.phase === 'dodge';
   const dashImpact = closing >= 100 && (a.phase === 'dash' || b.phase === 'dash' || wasDodging);
   const force = closing * (dashImpact ? .98 : .8);
-  a.vx -= nx * force;
-  a.vy -= ny * force;
-  b.vx += nx * force;
-  b.vy += ny * force;
-  if (wasDodging) b.phase = 'idle';
+  if (!anchoredA) {
+    a.vx -= nx * force;
+    a.vy -= ny * force;
+  }
+  if (!anchoredB) {
+    b.vx += nx * force;
+    b.vy += ny * force;
+  }
+  if (wasDodging && !anchoredB) b.phase = 'idle';
   if (!dashImpact) return;
 
   if (tutorial && (a.phase === 'dash' || (tutorial.stage === 'combat' && playerApproach > 0))) {
     tutorial.enemyKnocked = true;
   }
-  a.phase = 'idle';
-  b.phase = 'idle';
-  a.stagger = b.stagger = .46;
+  for (const top of [a,b]) {
+    if (top.effect === 'D') continue;
+    top.phase = 'idle';
+    top.stagger = .46;
+  }
   showImpact((a.x + b.x) / 2, (a.y + b.y) / 2, '#ffe3a6');
 }
 
@@ -505,6 +674,7 @@ function applyDamage(top, damage, labelX, color) {
   const lost = Math.min(damage, Math.max(0, top.hp - minHp));
   if (lost === 0) return;
   top.hp -= lost;
+  top.damaged = true;
   hits.push({ x: labelX, y: top.y - 24, lost, color, life: .85 });
 }
 
@@ -550,6 +720,7 @@ function step(dt) {
   if (tops.some(top => top.hp === 0)) {
     if (rings.length) return;
     if (!tutorial) {
+      if (round.resolvingTurn) finishTurn();
       finish();
       return;
     }
@@ -561,11 +732,21 @@ function step(dt) {
     }
     updateHud();
   }
+  const starts = round.fieldItem ? tops.map(({x,y}) => ({x,y})) : null;
   tops.forEach(top => updateTop(top, dt));
+  if (starts) collectItem(starts);
   if (tops.every(top => top.hp > 0)) collide();
   for (const top of tops) {
     top.trail.push({ x: top.x, y: top.y });
     if (top.trail.length > 21) top.trail.shift();
+  }
+  if (round.resolvingTurn && round.elapsed >= round.nextStrike
+      && tops.every(top => top.hp > 0 && Math.hypot(top.vx, top.vy) <= TURN_SETTLE_SPEED)) {
+    for (const top of tops) top.vx = top.vy = 0;
+    finishTurn();
+    round.turn++;
+    if (!round.fieldItem && round.turn >= round.nextItemTurn) spawnItem();
+    updateItemHud();
   }
 }
 
@@ -753,6 +934,7 @@ function drawJoystick() {
 
 function updateShotClock() {
   const visible = canStrike() && round.shotTime !== null;
+  useItemButton.disabled = !visible || !tops[0].item;
   shotClock.hidden = !visible;
   if (!visible) return;
   const seconds = String(Math.ceil(round.shotTime));
@@ -808,6 +990,16 @@ function draw() {
     ctx.restore();
     drawTop(tops[highlightedTop]);
     return;
+  }
+  if (round.fieldItem) {
+    const {x, y, type} = round.fieldItem;
+    oval(x, y, ITEM_RADIUS + 3, ITEM_RADIUS + 3, '#1b222d', ITEMS[type].color, 2);
+    ctx.fillStyle = ITEMS[type].color;
+    ctx.font = 'bold 19px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(type, x, y);
+    ctx.textBaseline = 'alphabetic';
   }
   tops.forEach(drawTrail);
   for (const ring of rings) {
@@ -931,6 +1123,19 @@ fastModeButton.addEventListener('click', () => {
   round.started = true;
   round.shotTime = SHOT_WINDOW;
   updateShotClock();
+  updateItemHud();
+});
+useItemButton.addEventListener('click', () => {
+  if (!canStrike() || tutorial || !tops[0].item) return;
+  const item = tops[0].item;
+  if (item === 'A' || item === 'B') {
+    round.armedItem = item;
+    gesture = null;
+    strike(0, 0);
+    return;
+  }
+  round.armedItem = round.armedItem === item ? null : item;
+  updateItemHud();
 });
 tutorialNext.addEventListener('click', () => {
   if (tutorialIntro.hidden) return;
