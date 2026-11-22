@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.68</span>
+  <span class="version">v0.69</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -532,7 +532,7 @@ function distanceToWall(top, angle) {
   return Math.max(0, -along + Math.sqrt(discriminant));
 }
 
-function playerTravelToWall(top, angle, speed, duration) {
+function playerTravelDistance(speed, duration) {
   // Each physics step applies drag before advancing the top.
   const dashSteps = Math.ceil(duration / FIXED_STEP) - 1;
   const dashDrag = Math.exp(-PLAYER_DASH_DRAG * FIXED_STEP);
@@ -540,7 +540,7 @@ function playerTravelToWall(top, angle, speed, duration) {
   const remaining = dashDrag ** dashSteps;
   const dashTravel = speed * FIXED_STEP * dashDrag * (1 - remaining) / (1 - dashDrag);
   const coastTravel = speed * FIXED_STEP * remaining * idleDrag / (1 - idleDrag);
-  return Math.min(dashTravel + coastTravel, distanceToWall(top, angle));
+  return dashTravel + coastTravel;
 }
 
 function predictAngle(player, enemy, playerAngle, playerPower, enemySpeed, enemyDuration) {
@@ -873,7 +873,7 @@ function drawDashPath(top, dash, playerPath, opacity) {
   if (!dash || dash.speed <= 0) return;
   const enemyTravel = dash.speed * (dash.phase === 'dodge' ? dash.duration / 2 : dash.duration + 1 / IDLE_DRAG);
   const length = playerPath
-    ? playerTravelToWall(top, dash.angle, dash.speed, dash.duration)
+    ? Math.min(playerTravelDistance(dash.speed, dash.duration), distanceToWall(top, dash.angle))
     : Math.min(enemyTravel, distanceToWall(top, dash.angle));
   const tip = playerPath ? length : Math.max(length, RADIUS - 3);
   if (tip <= 0) return;
@@ -907,7 +907,7 @@ function drawAim() {
   const player = tops[0];
   const { angle, power } = gesture;
   if (power <= 0) return;
-  const tip = playerTravelToWall(player, angle, playerDashSpeed(power), dashDuration(power));
+  const tip = playerTravelDistance(playerDashSpeed(power), dashDuration(power));
   if (tip <= 0) return;
   const arrow = Math.min(11, tip * .55);
   const chargeColor = power >= .95 ? '#ffe4a0' : player.color.light;
