@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.71</span>
+  <span class="version">v0.72</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -405,9 +405,18 @@ function playerPathReachesEnemy(player, enemy, dash) {
   const uy = Math.sin(dash.angle);
   const along = dx * ux + dy * uy;
   if (along <= 0) return false;
-  const travel = Math.min(playerTravelDistance(dash.speed, dash.duration), distanceToWall(player, dash.angle));
-  const closest = Math.min(along, travel);
+  const closest = Math.min(along, playerPathLength(player, dash));
   return Math.hypot(dx - ux * closest, dy - uy * closest) <= RADIUS * 2;
+}
+
+function playerCanReachItem(player, dash, item) {
+  if (!dash) return false;
+  const travel = playerPathLength(player, dash);
+  const end = {
+    x: player.x + Math.cos(dash.angle) * travel,
+    y: player.y + Math.sin(dash.angle) * travel
+  };
+  return Number.isFinite(itemContactTime(item, player, end));
 }
 
 function chooseEnemyAction(player, enemy, playerDash, weakSideMove, opponentDistance) {
@@ -429,12 +438,16 @@ function chooseEnemyAction(player, enemy, playerDash, weakSideMove, opponentDist
   const useSturdy = enemy.item === 'D' && (action === 'attack' || (nearby && player.item));
   const item = useProtection || useSturdy ? enemy.item : null;
   if (action === 'pickup') {
-    const {x, y} = round.fieldItem;
+    const fieldItem = round.fieldItem;
+    const {x, y} = fieldItem;
     const dx = x - enemy.x;
     const dy = y - enemy.y;
-    const duration = dashDuration(.75);
+    const power = .75;
+    const duration = dashDuration(power);
     // Budget for both the dash and the glide after it.
-    const speed = Math.hypot(dx, dy) / (duration + 1 / IDLE_DRAG);
+    const safeSpeed = Math.hypot(dx, dy) / (duration + 1 / IDLE_DRAG);
+    const race = playerCanReachItem(player, playerDash, fieldItem) && Math.random() < .5;
+    const speed = race ? dashSpeed(power) : safeSpeed;
     return {dash: {angle: Math.atan2(dy, dx), speed, duration, phase:'dash'}, item};
   }
   const move = action === 'dodge'
@@ -484,12 +497,11 @@ function spawnItem() {
   }
 }
 
-function itemContactTime(item, start, top) {
-  if (top.hp <= 0) return Infinity;
+function itemContactTime(item, start, end) {
   const x = start.x - item.x;
   const y = start.y - item.y;
-  const dx = top.x - start.x;
-  const dy = top.y - start.y;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
   const gap = x * x + y * y - (RADIUS + ITEM_RADIUS) ** 2;
   if (gap <= 0) return 0;
   const speedSquared = dx * dx + dy * dy;
@@ -502,7 +514,7 @@ function itemContactTime(item, start, top) {
 
 function collectItem(starts) {
   const item = round.fieldItem;
-  const [first, second] = tops.map((top, i) => itemContactTime(item, starts[i], top));
+  const [first, second] = tops.map((top, i) => top.hp > 0 ? itemContactTime(item, starts[i], top) : Infinity);
   if (!Number.isFinite(Math.min(first, second))) return;
   const owner = first === second ? tops[Math.random() < .5 ? 0 : 1] : tops[first < second ? 0 : 1];
   owner.item = item.type;
@@ -562,6 +574,10 @@ function playerTravelDistance(speed, duration) {
   const dashTravel = speed * FIXED_STEP * dashDrag * (1 - remaining) / (1 - dashDrag);
   const coastTravel = speed * FIXED_STEP * remaining * idleDrag / (1 - idleDrag);
   return dashTravel + coastTravel;
+}
+
+function playerPathLength(player, dash) {
+  return Math.min(playerTravelDistance(dash.speed, dash.duration), distanceToWall(player, dash.angle));
 }
 
 function predictAngle(player, enemy, playerAngle, playerPower, enemySpeed, enemyDuration) {
@@ -861,17 +877,18 @@ function drawTrail(top) {
   ctx.globalAlpha = 1;
 }
 
-function drawTop(top) {
+function drawTop(top, previewItem) {
   const color = top.color;
   const wobble = top.hp < 25 && !reducedMotion.matches ? Math.sin(top.spin * .64) * 3 : 0;
   ctx.save();
   ctx.translate(top.x, top.y);
   oval(2, 8, 29, 25, '#080a10a0');
   ctx.translate(wobble, 0);
-  if ((top.effect === 'B' && !top.damaged) || (top.effect === 'C' && !top.collided) || top.effect === 'D') {
+  const effect = previewItem ?? top.effect;
+  if ((effect === 'B' && (previewItem || !top.damaged)) || (effect === 'C' && (previewItem || !top.collided)) || effect === 'D') {
     const outlineRadius = RADIUS + 3;
     oval(0, 0, outlineRadius, outlineRadius, null, '#10141a', 5);
-    oval(0, 0, outlineRadius, outlineRadius, null, ITEMS[top.effect].color, 3);
+    oval(0, 0, outlineRadius, outlineRadius, null, ITEMS[effect].color, 3);
   }
   ctx.rotate(top.spin);
   oval(0, 0, RADIUS, RADIUS, color.dark, '#10141a', 2);
@@ -899,7 +916,7 @@ function drawDashPath(top, dash, playerPath, opacity) {
   if (!dash || dash.speed <= 0) return;
   const enemyTravel = dash.speed * (dash.phase === 'dodge' ? dash.duration / 2 : dash.duration + 1 / IDLE_DRAG);
   const length = playerPath
-    ? Math.min(playerTravelDistance(dash.speed, dash.duration), distanceToWall(top, dash.angle))
+    ? playerPathLength(top, dash)
     : Math.min(enemyTravel, distanceToWall(top, dash.angle));
   const tip = playerPath ? length : Math.max(length, RADIUS - 3);
   if (tip <= 0) return;
@@ -1062,7 +1079,8 @@ function draw() {
     oval(ring.x, ring.y, radius, radius, null, ring.color, 2);
   }
   ctx.globalAlpha = 1;
-  tops.forEach(drawTop);
+  drawTop(tops[0], pendingDash?.playerItem);
+  drawTop(tops[1], pendingDash?.enemyItem);
   if (pendingDash) {
     const previewElapsed = PATH_PREVIEW_SECONDS - pendingDash.remaining;
     const opacity = reducedMotion.matches ? 1 : .65 + .35 * Math.cos(previewElapsed * TAU * 2);
