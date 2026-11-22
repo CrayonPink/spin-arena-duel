@@ -105,7 +105,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.63</span>
+  <span class="version">v0.64</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -397,7 +397,12 @@ function chooseEnemyAction(player, enemy, weakSideMove) {
     && Math.random() >= .5 ? enemy.item : null;
   if (action === 'pickup') {
     const {x, y} = round.fieldItem;
-    return {dash: {angle: Math.atan2(y - enemy.y, x - enemy.x), speed: dashSpeed(.75), duration: dashDuration(.75), phase:'dash'}, item};
+    const dx = x - enemy.x;
+    const dy = y - enemy.y;
+    const duration = dashDuration(.75);
+    // Budget for both the dash and the glide after it.
+    const speed = Math.hypot(dx, dy) / (duration + 1 / IDLE_DRAG);
+    return {dash: {angle: Math.atan2(dy, dx), speed, duration, phase:'dash'}, item};
   }
   const move = action === 'dodge'
     ? {tactic:'dodge', power:random(.05, .23), preferredSide:Math.random() < .5 ? -1 : 1}
