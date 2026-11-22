@@ -56,9 +56,8 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .item-turn{position:absolute;right:0;top:calc(100% + 42px)}
 .item-effect{position:absolute;top:100%;left:0;z-index:1;width:min(265px,100%);margin:6px 0 0;padding:8px 10px;border:1px solid #62737d;background:#121a24ee;font-size:14px;line-height:1.4;pointer-events:auto}
 .item-status button{pointer-events:auto;white-space:normal}
-.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3;background:#000a}
-.stage:has(.item-status:not([hidden])[data-blast-preview="true"])::after{background:transparent}
-.stage:has(.item-status:not([hidden])[data-blast-preview="true"]) > :is(.score,.hud-button,.version,.fullscreen-status){filter:brightness(.32)}
+.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3}
+.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.hud-button,.version,.fullscreen-status){filter:brightness(.32)}
 .item-status:has(#useItem[aria-expanded="true"]){z-index:4}
 #useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
 .item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
@@ -114,7 +113,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.75</span>
+  <span class="version">v0.76</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -467,7 +466,6 @@ function updateItemHud() {
   const playerItem = ITEMS[player.item];
   const armed = round.armedItem !== null;
   const expanded = Boolean(playerItem) && round.itemDetailsOpen;
-  itemStatus.dataset.blastPreview = String(expanded && player.item === 'A');
   useItemButton.textContent = armed ? playerItem.name + ' 사용 예약 · 취소'
     : playerItem ? playerItem.name + ' 사용' : '아이템 없음';
   useItemButton.setAttribute('aria-expanded', String(expanded));
@@ -1071,6 +1069,7 @@ function draw() {
   ctx.setTransform(density, 0, 0, density, 0, 0);
   ctx.clearRect(0, 0, drawWidth, drawHeight);
   if (!tops) return;
+  const [player, enemy] = tops;
   const shake = gesture ? 0 : round.shake * 28;
   ctx.translate(drawWidth / 2 + Math.sin(round.elapsed * 123) * shake, arenaCenterY);
   ctx.scale(scale, scale);
@@ -1099,13 +1098,13 @@ function draw() {
     oval(ring.x, ring.y, radius, radius, null, ring.color, 2);
   }
   ctx.globalAlpha = 1;
-  drawTop(tops[0], pendingDash?.playerItem);
-  drawTop(tops[1], pendingDash?.enemyItem);
+  drawTop(player, pendingDash?.playerItem ?? round.armedItem);
+  drawTop(enemy, pendingDash?.enemyItem);
   if (pendingDash) {
     const previewElapsed = PATH_PREVIEW_SECONDS - pendingDash.remaining;
     const opacity = reducedMotion.matches ? 1 : .65 + .35 * Math.cos(previewElapsed * TAU * 2);
-    drawDashPath(tops[0], pendingDash.playerDash, true, opacity);
-    drawDashPath(tops[1], pendingDash.enemyDash, false, opacity);
+    drawDashPath(player, pendingDash.playerDash, true, opacity);
+    drawDashPath(enemy, pendingDash.enemyDash, false, opacity);
   }
   if (!reducedMotion.matches) {
     for (const spark of sparks) {
@@ -1129,10 +1128,12 @@ function draw() {
     ctx.fillText('−' + hit.lost, hit.x, hit.y);
   }
   ctx.globalAlpha = 1;
-  if (!itemStatus.hidden && itemStatus.dataset.blastPreview === 'true') {
-    const [player] = tops;
+  if (!itemStatus.hidden && !itemEffect.hidden) {
     dimArena();
-    oval(player.x, player.y, BLAST_RANGE, BLAST_RANGE, '#ffb18025', ITEMS.A.color, 3);
+    if (player.item === 'A') {
+      oval(player.x, player.y, BLAST_RANGE, BLAST_RANGE, '#ffb18025', ITEMS.A.color, 3);
+      if (Math.hypot(enemy.x - player.x, enemy.y - player.y) <= BLAST_RANGE) drawTop(enemy);
+    }
     drawTop(player);
     return;
   }
