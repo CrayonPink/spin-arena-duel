@@ -12,7 +12,7 @@ body{margin:0;min-width:270px}
 button{font:inherit;color:inherit;cursor:pointer}
 .stage{position:relative;isolation:isolate;overflow:hidden;height:100dvh;background:#181c22;--hud-top:max(8px,env(safe-area-inset-top));--hud-left:max(8px,env(safe-area-inset-left));--hud-right:max(8px,env(safe-area-inset-right));--score-height:clamp(44px,9dvh,82px);--hud-row:calc(var(--hud-top) + var(--score-height) + 6px);--bottom-inset:max(8px,env(safe-area-inset-bottom))}
 .fighter-head{display:flex;align-items:center;justify-content:space-between;gap:4px}
-button{font-size:clamp(12px,2.7vh,15px);font-weight:750}
+button{font-size:clamp(15px,3.1vh,19px);font-weight:750}
 .version{position:absolute;right:var(--hud-right);bottom:var(--bottom-inset);color:#f3eee2;opacity:.45;font-size:11px;font-weight:700;pointer-events:none}
 .score{position:absolute;inset:var(--hud-top) var(--hud-right) auto var(--hud-left);height:var(--score-height);display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:clamp(6px,2.5vw,32px);background:#1c2026;border:1px solid #353b40;padding:0 clamp(7px,2vw,24px);border-radius:12px;pointer-events:none}
 .fighter{min-width:0;color:var(--blue)}
@@ -42,22 +42,26 @@ canvas{width:100%;height:100%;display:block;touch-action:none;user-select:none;-
 .tutorial-copy{display:grid;gap:3px;padding:6px 12px;border:1px solid #62737d;border-radius:8px;background:#121a24ee;color:#f3eee2;font-size:clamp(12px,3vh,16px);line-height:1.25}
 .tutorial-copy span{color:#c9e9f1}
 .challenge-text{margin-top:4px;font-size:12px;font-weight:750;color:#d6c7aa}
-button{min-height:42px;padding:0 clamp(10px,2vw,19px);border-radius:8px;border:1px solid #4a4f57;background:#242930;white-space:nowrap;touch-action:manipulation}
+button{min-height:54px;padding:0 clamp(16px,3.5vw,26px);border-radius:8px;border:1px solid #4a4f57;background:#242930;white-space:nowrap;touch-action:manipulation}
 button:hover{background:#343b44}
 button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .primary{background:#ebe0bd;color:#202126;border-color:#ebe0bd}
 .primary:hover{background:#fff0c8}
-.hud-button{position:absolute;top:var(--hud-row);z-index:2;min-height:40px;padding:0 10px;font-size:12px;color:#ced8dc}
+.hud-button{position:absolute;top:var(--hud-row);z-index:2;min-height:50px;padding:0 clamp(12px,2vw,18px);font-size:clamp(14px,2.7vh,17px);color:#ced8dc}
 .fast-mode{right:var(--hud-right)}
 .fullscreen{left:var(--hud-left)}
-.item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 76px) var(--hud-left);z-index:2;pointer-events:none}
+.item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 86px) var(--hud-left);z-index:2;pointer-events:none}
 .item-status[hidden]{display:none}
 .item-turn,.item-effect{padding:5px 8px;border-radius:6px;background:#151a22f2;color:#eee3c9;font-size:12px}
-.item-turn{position:absolute;right:0;top:calc(100% + 32px)}
-.item-effect{position:absolute;top:100%;left:0;width:min(245px,100%);margin:4px 0 0;line-height:1.4;pointer-events:auto}
+.item-turn{position:absolute;right:0;top:calc(100% + 42px)}
+.item-effect{position:absolute;top:100%;left:0;z-index:1;width:min(265px,100%);margin:6px 0 0;padding:8px 10px;border:1px solid #62737d;background:#121a24ee;font-size:14px;line-height:1.4;pointer-events:auto}
 .item-status button{pointer-events:auto;white-space:normal}
+.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3;background:#000a}
+.item-status:has(#useItem[aria-expanded="true"]){z-index:4}
+#useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
+.item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
 .hud-button[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
-.fullscreen-status{position:absolute;top:calc(var(--hud-row) + 46px);left:var(--hud-left);max-width:calc(100% - var(--hud-left) - var(--hud-right));z-index:3;margin:0;padding:6px 9px;border-radius:8px;background:#121a24ee;font-size:12px;pointer-events:none}
+.fullscreen-status{position:absolute;top:calc(var(--hud-row) + 56px);left:var(--hud-left);max-width:calc(100% - var(--hud-left) - var(--hud-right));z-index:3;margin:0;padding:6px 9px;border-radius:8px;background:#121a24ee;font-size:12px;pointer-events:none}
 .fullscreen-status:empty{display:none}
 .stage:fullscreen{width:100%;height:100%}
 .fast-mode-guide{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:16px;background:#000c;text-align:center}
@@ -67,7 +71,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .stage:has(.fast-mode-guide:not([hidden])) .fast-mode{z-index:6;outline:2px solid var(--blue);outline-offset:3px}
 .fast-mode-arrow{display:none}
 .stage:has(.fast-mode-guide:not([hidden])) .fast-mode-arrow{display:block;position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);color:var(--blue);font-size:32px;line-height:1;pointer-events:none}
-@media(max-width:480px){.tutorial{top:calc(var(--hud-row) + 46px);left:var(--hud-left);right:var(--hud-right)}}
+@media(max-width:480px){.tutorial{top:calc(var(--hud-row) + 56px);left:var(--hud-left);right:var(--hud-right)}}
 @media(max-width:420px){.fighter-head{flex-wrap:wrap;row-gap:0}}
 @media(prefers-reduced-motion:reduce){.fill{transition:none}}
 </style>
@@ -108,7 +112,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.66</span>
+  <span class="version">v0.67</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
