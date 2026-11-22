@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.69</span>
+  <span class="version">v0.70</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -399,8 +399,12 @@ function chooseEnemyMove(weakSideMove, opponentDistance) {
 
 function chooseEnemyAction(enemy, weakSideMove, opponentDistance) {
   const choices = ['attack'];
-  if (opponentDistance >= DODGE_MIN_DISTANCE) choices.push('dodge');
-  if (round.fieldItem) choices.push('pickup');
+  if (round.fieldItem) {
+    // Picking up the field item has triple the weight of each other action.
+    choices.push('pickup', 'pickup', 'pickup');
+  } else if (opponentDistance >= DODGE_MIN_DISTANCE) {
+    choices.push('dodge');
+  }
   if (enemy.item === 'A' && opponentDistance <= BLAST_RANGE) choices.push('A');
   if (enemy.item === 'B' && enemy.hp < MAX_HP) choices.push('B');
   const action = choices[Math.floor(Math.random() * choices.length)];
