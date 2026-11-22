@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.74</span>
+  <span class="version">v0.75</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -165,6 +165,8 @@ const ARENA_RADIUS = 225;
 const WALL_RADIUS = ARENA_RADIUS - RADIUS - 6;
 const FIXED_STEP = 1 / 120;
 const JOYSTICK_DEAD_ZONE = 7;
+const JOYSTICK_CANCEL_RADIUS = 17;
+const JOYSTICK_CANCEL_CHARGE = .45;
 const CHARGE_SLOW_RATE = .20;
 const SHOT_WINDOW = 10;
 const PATH_PREVIEW_SECONDS = 2;
@@ -360,8 +362,11 @@ function updateJoystick(x, y) {
   const dy = y - gesture.startY;
   const distance = Math.hypot(dx, dy);
   gesture.angle = Math.atan2(dy, dx);
-  gesture.stickDistance = Math.min(distance, joystickRadius);
-  gesture.power = clamp((distance - JOYSTICK_DEAD_ZONE) / (joystickRadius - JOYSTICK_DEAD_ZONE), 0, 1);
+  const power = clamp((distance - JOYSTICK_DEAD_ZONE) / (joystickRadius - JOYSTICK_DEAD_ZONE), 0, 1);
+  if (power >= JOYSTICK_CANCEL_CHARGE) gesture.canCancelCharge = true;
+  const inCancelZone = gesture.canCancelCharge && distance <= JOYSTICK_CANCEL_RADIUS;
+  gesture.stickDistance = inCancelZone ? 0 : Math.min(distance, joystickRadius);
+  gesture.power = inCancelZone ? 0 : power;
 }
 
 function dashDuration(power) {
@@ -993,6 +998,9 @@ function drawJoystick() {
   ctx.setTransform(density, 0, 0, density, 0, 0);
   ctx.translate(originX, originY);
   oval(0, 0, joystickRadius, joystickRadius, '#10192288', '#a7efff75', 1.5);
+  if (gesture.canCancelCharge) {
+    oval(0, 0, JOYSTICK_CANCEL_RADIUS, JOYSTICK_CANCEL_RADIUS, null, power === 0 ? '#a7efff' : '#a7efff75', 1.5);
+  }
   oval(0, 0, 4, 4, '#d3f4ff');
   if (power > 0) {
     ctx.beginPath();
@@ -1289,7 +1297,7 @@ canvas.addEventListener('pointerdown', event => {
   gesture = {
     id: event.pointerId, startX: event.clientX, startY: event.clientY,
     originX: event.clientX - bounds.left, originY: event.clientY - bounds.top,
-    angle: 0, stickDistance: 0, power: 0
+    angle: 0, stickDistance: 0, power: 0, canCancelCharge: false
   };
   canvas.setPointerCapture(event.pointerId);
 });
@@ -1302,7 +1310,7 @@ canvas.addEventListener('pointerup', event => {
   updateJoystick(event.clientX, event.clientY);
   const { angle, power } = gesture;
   gesture = null;
-  strike(angle, power);
+  if (power > 0) strike(angle, power);
 });
 for (const type of ['pointercancel', 'lostpointercapture']) {
   canvas.addEventListener(type, event => {
