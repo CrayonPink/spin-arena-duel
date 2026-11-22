@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.72</span>
+  <span class="version">v0.73</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -186,7 +186,7 @@ const ITEMS = {
   A: {name:'폭탄', color:'#ffb180', description:'턴 시작 시 주변의 적을 밀쳐냅니다. 이동 불가'},
   B: {name:'회복', color:'#abed9d', description:'다음 턴 종료 시까지 데미지를 받지 않으면 HP를 20 회복합니다. 이동 불가'},
   C: {name:'보호', color:'#a7deff', description:'다음 턴에 적 팽이와 충돌하기 전까지는 벽에 충돌해도 데미지를 받지 않습니다.'},
-  D: {name:'견고', color:'#e1b9ff', description:'다음 턴 동안에는 적과 충돌하거나 폭발에 휘말려도 밀려나지 않습니다.'}
+  D: {name:'견고', color:'#e1b9ff', description:'다음 턴에 한 번은 적과 충돌하거나 폭발에 휘말려도 밀려나지 않습니다.'}
 };
 const itemTypes = Object.keys(ITEMS);
 const palette = [
@@ -252,7 +252,7 @@ function resetRound(started = false) {
   round = {
     elapsed: 0, started, enemyDashUntil: 0,
     playerDashUntil: 0, nextStrike: 0, shotTime: started && !tutorial ? SHOT_WINDOW : null,
-    over: false, freeze: 0, shake: 0,
+    over: false, freeze: 0, shake: 0, mutualSturdyContact: false,
     turn: 1, resolvingTurn: false, fieldItem: null, nextItemTurn: ITEM_INTERVAL, armedItem: null, itemDetailsOpen: false
   };
   sparks = [];
@@ -525,6 +525,7 @@ function collectItem(starts) {
 
 function activateItems(playerItem, enemyItem) {
   const effects = [playerItem, enemyItem];
+  round.mutualSturdyContact = false;
   tops.forEach((top, i) => {
     const item = effects[i];
     top.effect = item;
@@ -538,9 +539,13 @@ function activateItems(playerItem, enemyItem) {
     const target = tops[1 - i];
     const dx = target.x - top.x;
     const dy = target.y - top.y;
-    if (target.effect !== 'D' && Math.hypot(dx, dy) <= BLAST_RANGE) {
-      launch(target, Math.atan2(dy, dx), BLAST_SPEED, 'idle');
-      target.stagger = .46;
+    if (Math.hypot(dx, dy) <= BLAST_RANGE) {
+      if (target.effect === 'D') {
+        target.effect = null;
+      } else {
+        launch(target, Math.atan2(dy, dx), BLAST_SPEED, 'idle');
+        target.stagger = .46;
+      }
     }
     showImpact(top.x, top.y, ITEMS.A.color);
   });
@@ -687,13 +692,17 @@ function releasePreview() {
 function collide() {
   const [a, b] = tops;
   const separation = Math.hypot(b.x - a.x, b.y - a.y);
-  if (separation >= RADIUS * 2) return;
+  if (separation >= RADIUS * 2) {
+    round.mutualSturdyContact = false;
+    return;
+  }
+  if (round.mutualSturdyContact) return;
   const nx = separation > .001 ? (b.x - a.x) / separation : 1;
   const ny = separation > .001 ? (b.y - a.y) / separation : 0;
   const playerApproach = a.vx * nx + a.vy * ny;
   const closing = playerApproach - (b.vx * nx + b.vy * ny);
-  const anchoredA = a.effect === 'D';
-  const anchoredB = b.effect === 'D';
+  const anchoredA = closing > 0 && a.effect === 'D';
+  const anchoredB = closing > 0 && b.effect === 'D';
   const push = RADIUS * 2 - separation + .2;
   if (!anchoredA) {
     a.x -= nx * push * (anchoredB ? 1 : .5);
@@ -705,9 +714,11 @@ function collide() {
   }
   if (closing <= 0) return;
   a.collided = b.collided = true;
+  // If both tops resist the same hit, let them separate before resolving another.
+  round.mutualSturdyContact = anchoredA && anchoredB;
   const wasDodging = b.phase === 'dodge';
   const dashImpact = closing >= 100 && (a.phase === 'dash' || b.phase === 'dash' || wasDodging);
-  const force = closing * (dashImpact ? .98 : .8);
+  const force = closing * (anchoredA || anchoredB ? 1 : dashImpact ? .98 : .8);
   if (!anchoredA) {
     a.vx -= nx * force;
     a.vy -= ny * force;
@@ -717,17 +728,20 @@ function collide() {
     b.vy += ny * force;
   }
   if (wasDodging && !anchoredB) b.phase = 'idle';
-  if (!dashImpact) return;
-
-  if (tutorial && (a.phase === 'dash' || (tutorial.stage === 'combat' && playerApproach > 0))) {
-    tutorial.enemyKnocked = true;
+  if (dashImpact) {
+    if (tutorial && (a.phase === 'dash' || (tutorial.stage === 'combat' && playerApproach > 0))) {
+      tutorial.enemyKnocked = true;
+    }
+    for (const top of [a,b]) {
+      if (top.effect === 'D') continue;
+      top.phase = 'idle';
+      top.stagger = .46;
+    }
+    showImpact((a.x + b.x) / 2, (a.y + b.y) / 2, '#ffe3a6');
   }
-  for (const top of [a,b]) {
-    if (top.effect === 'D') continue;
-    top.phase = 'idle';
-    top.stagger = .46;
-  }
-  showImpact((a.x + b.x) / 2, (a.y + b.y) / 2, '#ffe3a6');
+  if (anchoredA) a.effect = null;
+  if (anchoredB) b.effect = null;
+  if (anchoredA) updateItemHud();
 }
 
 function applyDamage(top, damage, labelX, color) {
