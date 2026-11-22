@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.70</span>
+  <span class="version">v0.71</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -397,20 +397,37 @@ function chooseEnemyMove(weakSideMove, opponentDistance) {
   return { tactic: 'headOn', power: random(.6, .95) };
 }
 
-function chooseEnemyAction(enemy, weakSideMove, opponentDistance) {
+function playerPathReachesEnemy(player, enemy, dash) {
+  if (!dash) return false;
+  const dx = enemy.x - player.x;
+  const dy = enemy.y - player.y;
+  const ux = Math.cos(dash.angle);
+  const uy = Math.sin(dash.angle);
+  const along = dx * ux + dy * uy;
+  if (along <= 0) return false;
+  const travel = Math.min(playerTravelDistance(dash.speed, dash.duration), distanceToWall(player, dash.angle));
+  const closest = Math.min(along, travel);
+  return Math.hypot(dx - ux * closest, dy - uy * closest) <= RADIUS * 2;
+}
+
+function chooseEnemyAction(player, enemy, playerDash, weakSideMove, opponentDistance) {
+  const nearby = opponentDistance < DODGE_MIN_DISTANCE;
+  if (enemy.item === 'A' && opponentDistance <= BLAST_RANGE) return {dash:null, item:'A'};
+  const canHeal = enemy.item === 'B' && enemy.hp < MAX_HP;
+  if (canHeal && !playerPathReachesEnemy(player, enemy, playerDash)) return {dash:null, item:'B'};
+
   const choices = ['attack'];
   if (round.fieldItem) {
-    // Picking up the field item has triple the weight of each other action.
-    choices.push('pickup', 'pickup', 'pickup');
-  } else if (opponentDistance >= DODGE_MIN_DISTANCE) {
+    choices.push('pickup');
+  } else if (!nearby) {
     choices.push('dodge');
   }
-  if (enemy.item === 'A' && opponentDistance <= BLAST_RANGE) choices.push('A');
-  if (enemy.item === 'B' && enemy.hp < MAX_HP) choices.push('B');
+  if (canHeal) choices.push('B');
   const action = choices[Math.floor(Math.random() * choices.length)];
-  if (action === 'A' || action === 'B') return {dash: null, item: action};
-  const item = ((enemy.item === 'C' && action === 'attack') || (enemy.item === 'D' && action !== 'dodge'))
-    && Math.random() >= .5 ? enemy.item : null;
+  if (action === 'B') return {dash:null, item:'B'};
+  const useProtection = enemy.item === 'C' && action === 'attack' && !nearby;
+  const useSturdy = enemy.item === 'D' && (action === 'attack' || (nearby && player.item));
+  const item = useProtection || useSturdy ? enemy.item : null;
   if (action === 'pickup') {
     const {x, y} = round.fieldItem;
     const dx = x - enemy.x;
@@ -422,7 +439,7 @@ function chooseEnemyAction(enemy, weakSideMove, opponentDistance) {
   }
   const move = action === 'dodge'
     ? {tactic:'dodge', power:random(.05, .23), preferredSide:Math.random() < .5 ? -1 : 1}
-    : {tactic:weakSideMove && Math.random() >= .5 ? 'lead' : 'headOn', power:random(.6, .95)};
+    : {tactic:round.fieldItem || (weakSideMove && Math.random() >= .5) ? 'lead' : 'headOn', power:random(.6, .95)};
   return {move, item};
 }
 
@@ -632,8 +649,8 @@ function strike(angle, power, timedOut = false) {
   const opponentDistance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   const action = tutorial
     ? {move: enemyActive ? chooseEnemyMove(weakSideMove, opponentDistance) : null, item:null}
-    : chooseEnemyAction(enemy, weakSideMove, opponentDistance);
-  const enemyDash = action.move ? planEnemyDash(player, enemy, action.move, angle, power) : action.dash;
+    : chooseEnemyAction(player, enemy, playerDash, weakSideMove, opponentDistance);
+  const enemyDash = action.move ? planEnemyDash(player, enemy, action.move, angle, playerDash ? power : 0) : action.dash;
   const turn = {playerDash, enemyDash, playerItem, enemyItem:action.item};
   round.shotTime = null;
   if ((playerDash || (!tutorial && enemyDash)) && !fastMode && tutorial?.stage !== 'practice') {
@@ -851,6 +868,11 @@ function drawTop(top) {
   ctx.translate(top.x, top.y);
   oval(2, 8, 29, 25, '#080a10a0');
   ctx.translate(wobble, 0);
+  if ((top.effect === 'B' && !top.damaged) || (top.effect === 'C' && !top.collided) || top.effect === 'D') {
+    const outlineRadius = RADIUS + 3;
+    oval(0, 0, outlineRadius, outlineRadius, null, '#10141a', 5);
+    oval(0, 0, outlineRadius, outlineRadius, null, ITEMS[top.effect].color, 3);
+  }
   ctx.rotate(top.spin);
   oval(0, 0, RADIUS, RADIUS, color.dark, '#10141a', 2);
   for (let tooth = 0; tooth < 6; tooth++) {
