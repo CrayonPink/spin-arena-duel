@@ -57,6 +57,8 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .item-effect{position:absolute;top:100%;left:0;z-index:1;width:min(265px,100%);margin:6px 0 0;padding:8px 10px;border:1px solid #62737d;background:#121a24ee;font-size:14px;line-height:1.4;pointer-events:auto}
 .item-status button{pointer-events:auto;white-space:normal}
 .stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3;background:#000a}
+.stage:has(.item-status:not([hidden])[data-blast-preview="true"])::after{background:transparent}
+.stage:has(.item-status:not([hidden])[data-blast-preview="true"]) > :is(.score,.hud-button,.version,.fullscreen-status){filter:brightness(.32)}
 .item-status:has(#useItem[aria-expanded="true"]){z-index:4}
 #useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
 .item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
@@ -112,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.67</span>
+  <span class="version">v0.68</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -181,10 +183,10 @@ const BLAST_RANGE = 110;
 const BLAST_SPEED = 620;
 const TURN_SETTLE_SPEED = 8;
 const ITEMS = {
-  A: {name:'폭발', color:'#ffb180', description:'턴 시작에 가까운 적을 날려보냅니다. 이 턴에 직접 이동할 수 없습니다.'},
-  B: {name:'회복', color:'#abed9d', description:'피해 없이 턴을 끝내면 HP 20 회복. 이 턴에 직접 이동할 수 없습니다.'},
-  C: {name:'벽 보호', color:'#a7deff', description:'적과 충돌하기 전까지 벽 충돌 피해를 받지 않습니다.'},
-  D: {name:'버티기', color:'#e1b9ff', description:'이 턴에는 팽이 충돌과 폭발로 밀려나지 않습니다.'}
+  A: {name:'폭탄', color:'#ffb180', description:'턴 시작 시 주변의 적을 밀쳐냅니다. 이동 불가'},
+  B: {name:'회복', color:'#abed9d', description:'다음 턴 종료 시까지 데미지를 받지 않으면 HP를 20 회복합니다. 이동 불가'},
+  C: {name:'보호', color:'#a7deff', description:'다음 턴에 적 팽이와 충돌하기 전까지는 벽에 충돌해도 데미지를 받지 않습니다.'},
+  D: {name:'견고', color:'#e1b9ff', description:'다음 턴 동안에는 적과 충돌하거나 폭발에 휘말려도 밀려나지 않습니다.'}
 };
 const itemTypes = Object.keys(ITEMS);
 const palette = [
@@ -426,6 +428,7 @@ function updateItemHud() {
   const playerItem = ITEMS[player.item];
   const armed = round.armedItem !== null;
   const expanded = Boolean(playerItem) && round.itemDetailsOpen;
+  itemStatus.dataset.blastPreview = String(expanded && player.item === 'A');
   useItemButton.textContent = player.effect ? ITEMS[player.effect].name + ' 적용 중'
     : armed ? playerItem.name + ' 사용 예약 · 취소'
     : playerItem ? playerItem.name + ' 사용' : '아이템 없음';
@@ -993,6 +996,14 @@ function drawVignette() {
   ctx.restore();
 }
 
+function dimArena() {
+  ctx.save();
+  ctx.setTransform(density, 0, 0, density, 0, 0);
+  ctx.fillStyle = 'rgba(0, 0, 0, .68)';
+  ctx.fillRect(0, 0, drawWidth, drawHeight);
+  ctx.restore();
+}
+
 function draw() {
   ctx.setTransform(density, 0, 0, density, 0, 0);
   ctx.clearRect(0, 0, drawWidth, drawHeight);
@@ -1004,11 +1015,7 @@ function draw() {
   if (!tutorialIntro.hidden || !tutorialConfirm.hidden) {
     const highlightedTop = tutorial?.stage === 'enemyIntro' ? 1 : 0;
     drawTop(tops[1 - highlightedTop]);
-    ctx.save();
-    ctx.setTransform(density, 0, 0, density, 0, 0);
-    ctx.fillStyle = 'rgba(0, 0, 0, .68)';
-    ctx.fillRect(0, 0, drawWidth, drawHeight);
-    ctx.restore();
+    dimArena();
     drawTop(tops[highlightedTop]);
     return;
   }
@@ -1058,6 +1065,13 @@ function draw() {
     ctx.fillText('−' + hit.lost, hit.x, hit.y);
   }
   ctx.globalAlpha = 1;
+  if (!itemStatus.hidden && itemStatus.dataset.blastPreview === 'true') {
+    const [player] = tops;
+    dimArena();
+    oval(player.x, player.y, BLAST_RANGE, BLAST_RANGE, '#ffb18025', ITEMS.A.color, 3);
+    drawTop(player);
+    return;
+  }
   drawVignette();
   drawAim();
   drawJoystick();
