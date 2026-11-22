@@ -114,7 +114,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <button id="begin" class="primary">게임 시작</button>
   </div>
   <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.73</span>
+  <span class="version">v0.74</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -463,8 +463,7 @@ function updateItemHud() {
   const armed = round.armedItem !== null;
   const expanded = Boolean(playerItem) && round.itemDetailsOpen;
   itemStatus.dataset.blastPreview = String(expanded && player.item === 'A');
-  useItemButton.textContent = player.effect ? ITEMS[player.effect].name + ' 적용 중'
-    : armed ? playerItem.name + ' 사용 예약 · 취소'
+  useItemButton.textContent = armed ? playerItem.name + ' 사용 예약 · 취소'
     : playerItem ? playerItem.name + ' 사용' : '아이템 없음';
   useItemButton.setAttribute('aria-expanded', String(expanded));
   useItemButton.setAttribute('aria-pressed', String(armed));
@@ -741,7 +740,6 @@ function collide() {
   }
   if (anchoredA) a.effect = null;
   if (anchoredB) b.effect = null;
-  if (anchoredA) updateItemHud();
 }
 
 function applyDamage(top, damage, labelX, color) {
