@@ -162,7 +162,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.83</span>
+  <span class="version">v0.84</span>
   <div id="itemGuide" class="control-guide" hidden>
     <div class="tutorial-copy">
       <strong>얻은 아이템은 이 곳에 보관됩니다.</strong>
@@ -650,6 +650,7 @@ function collectItem(starts) {
   owner.item = item.type;
   round.fieldItem = null;
   round.nextItemTurn = round.turn + ITEM_INTERVAL;
+  if (owner === tops[0] && !itemTutorialDone) showItemTutorial();
   updateItemHud();
 }
 
@@ -957,10 +958,7 @@ function step(dt) {
     for (const top of tops) top.vx = top.vy = 0;
     finishTurn();
     round.turn++;
-    if (!round.fieldItem && round.turn >= round.nextItemTurn) {
-      spawnItem();
-      if (round.fieldItem && !itemTutorialDone) showItemTutorial();
-    }
+    if (!round.fieldItem && round.turn >= round.nextItemTurn) spawnItem();
     updateItemHud();
   }
 }
@@ -1407,6 +1405,7 @@ useItemButton.addEventListener('click', () => {
     canvas.inert = false;
     pauseButton.disabled = fastModeButton.disabled = false;
     useItemButton.removeAttribute('aria-describedby');
+    accumulator = 0;
     lastTime = undefined;
     updateItemHud();
     updateShotClock();
