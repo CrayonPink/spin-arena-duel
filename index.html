@@ -47,7 +47,7 @@ canvas{width:100%;height:100%;display:block;touch-action:none;user-select:none;-
 .tutorial:has(> button:not([hidden]),> .tutorial-actions){bottom:var(--bottom-inset);align-content:start}
 .tutorial > button,.tutorial-actions{position:absolute;bottom:0}
 .tutorial-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:100%}
-.stage:has(:is(#tutorialIntro,#tutorialConfirm):not([hidden])) > :is(.score,.hud-button,.version){filter:brightness(.32)}
+.stage:has(:is(#tutorialIntro,#tutorialConfirm):not([hidden])) > :is(.score,.version){filter:brightness(.32)}
 .tutorial button{pointer-events:auto}
 .tutorial-copy{display:grid;gap:3px;padding:6px 12px;border:1px solid #62737d;border-radius:8px;background:#121a24ee;color:#f3eee2;font-size:clamp(12px,3vh,16px);line-height:1.25}
 .tutorial-copy span{color:#c9e9f1}
@@ -57,7 +57,6 @@ button:hover{background:#343b44}
 button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .primary{background:#ebe0bd;color:#202126;border-color:#ebe0bd}
 .primary:hover{background:#fff0c8}
-.hud-button{position:absolute;top:var(--hud-row);z-index:2;min-height:50px;padding:0 clamp(12px,2vw,18px);font-size:clamp(14px,2.7vh,17px);color:#ced8dc}
 .challenge-list[hidden]{display:none}
 .challenge-list{position:relative;z-index:2;display:grid;gap:4px;margin:6px 0;padding:0;list-style:none;color:#f3eee2;font-size:clamp(15px,3vh,19px);line-height:1.3;text-shadow:0 1px 3px #000,0 1px 4px #000}
 :is(.challenge-list,.result-stars) .complete{color:#ffe4a0}
@@ -66,7 +65,6 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 #result .challenge-list{text-align:left;font-size:clamp(16px,3.4vh,22px)}
 .result-stars{display:flex;gap:.18em;margin:4px 0;font-size:clamp(29px,6.5vh,48px);line-height:1;color:#f3eee2}
 .result-stars[hidden]{display:none}
-.fullscreen{left:var(--hud-left)}
 .item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 86px) var(--hud-left);z-index:2;pointer-events:none}
 .item-status[hidden]{display:none}
 .item-turn,.item-effect{padding:5px 8px;border-radius:6px;background:#151a22f2;color:#eee3c9;font-size:12px}
@@ -74,12 +72,13 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .item-effect{position:absolute;top:100%;left:0;z-index:1;width:min(265px,100%);margin:6px 0 0;padding:8px 10px;border:1px solid #62737d;background:#121a24ee;font-size:14px;line-height:1.4;pointer-events:auto}
 .item-status button{pointer-events:auto;white-space:normal}
 .stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3}
-.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.hud-button,.version,.fullscreen-status){filter:brightness(.32)}
+.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.version){filter:brightness(.32)}
 .item-status:has(#useItem[aria-expanded="true"]){z-index:4}
 #useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
 .item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
-:is(.hud-button,.score-button)[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
-.fullscreen-status{position:absolute;top:calc(var(--hud-row) + 56px);left:var(--hud-left);max-width:calc(100% - var(--hud-left) - var(--hud-right));z-index:3;margin:0;padding:6px 9px;border-radius:8px;background:#121a24ee;font-size:12px;pointer-events:none}
+.score-button[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
+.pause-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.fullscreen-status{margin:10px 0 0;color:#ffc087;font-size:14px}
 .fullscreen-status:empty{display:none}
 .stage:fullscreen{width:100%;height:100%}
 .fast-mode-guide{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:16px;background:#000c;text-align:center}
@@ -107,8 +106,6 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 <body>
 <main class="stage" aria-label="팽이 치기">
   <canvas id="arena" aria-label="경기장. 터치한 곳을 기준으로 원하는 방향으로 밀었다 놓으면 두 팽이가 돌진합니다."></canvas>
-  <button type="button" id="fullscreen" class="hud-button fullscreen" aria-pressed="false">전체 화면</button>
-  <p id="fullscreenStatus" class="fullscreen-status" role="status"></p>
   <section class="score" aria-label="대전 현황">
     <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" hidden><strong id="shotSeconds">10</strong></div>
     <div class="fighter"><div class="fighter-head"><span class="name">교주의 팽이</span><span id="blueHp" class="hp">100 HP</span></div><div class="track"><div id="blueFill" class="fill"></div></div></div>
@@ -122,7 +119,11 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
   <dialog id="pauseMenu" class="pause-menu" aria-labelledby="pauseTitle">
     <h2 id="pauseTitle">일시 정지</h2>
     <ul id="challengeList" class="challenge-list" aria-label="도전 과제 현황"></ul>
-    <button id="resume" type="button" class="primary" autofocus>게임 재개</button>
+    <div class="pause-actions">
+      <button id="resume" type="button" class="primary" autofocus>게임 재개</button>
+      <button id="fullscreen" type="button">전체 화면</button>
+    </div>
+    <p id="fullscreenStatus" class="fullscreen-status" role="status"></p>
   </dialog>
   <div id="itemStatus" class="item-status" hidden>
     <button id="useItem" type="button" aria-expanded="false" aria-controls="itemEffect">아이템 없음</button>
@@ -154,7 +155,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.79</span>
+  <span class="version">v0.80</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -1314,6 +1315,12 @@ fullscreenButton.addEventListener('click', async () => {
       await document.exitFullscreen();
     } else {
       await stage.requestFullscreen();
+      if (pauseMenu.open) {
+        // Move the dialog above the stage in the browser's top layer.
+        pauseMenu.close();
+        pauseMenu.showModal();
+        fullscreenButton.focus();
+      }
     }
   } catch {
     fullscreenStatus.textContent = '이 브라우저 또는 미리보기에서는 전체 화면을 사용할 수 없어요.';
@@ -1321,7 +1328,7 @@ fullscreenButton.addEventListener('click', async () => {
   }
 });
 document.addEventListener('fullscreenchange', () => {
-  fullscreenButton.setAttribute('aria-pressed', String(document.fullscreenElement === stage));
+  fullscreenButton.textContent = document.fullscreenElement === stage ? '전체 화면 해제' : '전체 화면';
 });
 
 function showFastModeTutorial() {
@@ -1355,6 +1362,7 @@ pauseButton.addEventListener('click', () => {
 });
 resumeButton.addEventListener('click', () => pauseMenu.close());
 pauseMenu.addEventListener('close', () => {
+  if (pauseMenu.open) return;
   lastTime = undefined;
   pauseButton.focus({preventScroll: true});
 });
