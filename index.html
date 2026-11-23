@@ -48,7 +48,15 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .primary{background:#ebe0bd;color:#202126;border-color:#ebe0bd}
 .primary:hover{background:#fff0c8}
 .hud-button{position:absolute;top:var(--hud-row);z-index:2;min-height:50px;padding:0 clamp(12px,2vw,18px);font-size:clamp(14px,2.7vh,17px);color:#ced8dc}
-.fast-mode{right:var(--hud-right)}
+.challenge-hud{position:absolute;top:var(--hud-row);right:var(--hud-right);text-align:right;pointer-events:none}
+.challenge-hud[hidden],.challenge-list[hidden]{display:none}
+.challenge-buttons{display:flex;justify-content:flex-end;gap:6px}
+.challenge-buttons .hud-button{position:relative;top:auto;pointer-events:auto;padding-inline:clamp(8px,2vw,18px)}
+.challenge-list{position:relative;z-index:2;display:grid;gap:3px;margin:6px 0;padding:0;list-style:none;color:#f3eee2;font-size:clamp(12px,2.5vh,15px);text-shadow:0 1px 3px #000,0 1px 4px #000}
+.challenge-list .complete{color:#ffe4a0}
+.challenge-hud .challenge-text{position:relative;z-index:2;text-shadow:0 1px 3px #000}
+#result{z-index:3}
+#result .challenge-list{text-align:left}
 .fullscreen{left:var(--hud-left)}
 .item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 86px) var(--hud-left);z-index:2;pointer-events:none}
 .item-status[hidden]{display:none}
@@ -57,7 +65,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .item-effect{position:absolute;top:100%;left:0;z-index:1;width:min(265px,100%);margin:6px 0 0;padding:8px 10px;border:1px solid #62737d;background:#121a24ee;font-size:14px;line-height:1.4;pointer-events:auto}
 .item-status button{pointer-events:auto;white-space:normal}
 .stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3}
-.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.hud-button,.version,.fullscreen-status){filter:brightness(.32)}
+.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.hud-button,.version,.fullscreen-status,.challenge-hud){filter:brightness(.32)}
 .item-status:has(#useItem[aria-expanded="true"]){z-index:4}
 #useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
 .item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
@@ -82,7 +90,14 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
   <canvas id="arena" aria-label="경기장. 터치한 곳을 기준으로 원하는 방향으로 밀었다 놓으면 두 팽이가 돌진합니다."></canvas>
   <button type="button" id="fullscreen" class="hud-button fullscreen" aria-pressed="false">전체 화면</button>
   <p id="fullscreenStatus" class="fullscreen-status" role="status"></p>
-  <button type="button" id="fastMode" class="hud-button fast-mode" aria-pressed="false" hidden>배속 모드<span class="fast-mode-arrow" aria-hidden="true">↑</span></button>
+  <div id="challengeHud" class="challenge-hud" hidden>
+    <div class="challenge-buttons">
+      <button type="button" id="fastMode" class="hud-button fast-mode" aria-pressed="false" hidden>배속 모드<span class="fast-mode-arrow" aria-hidden="true">↑</span></button>
+      <button type="button" id="challengeToggle" class="hud-button" aria-expanded="true" aria-controls="challengeList">도전 과제</button>
+    </div>
+    <ul id="challengeList" class="challenge-list" aria-label="도전 과제" aria-live="polite"></ul>
+    <span id="streak" class="challenge-text"></span>
+  </div>
   <section class="score" aria-label="대전 현황">
     <div class="fighter"><div class="fighter-head"><span class="name">교주의 팽이</span><span id="blueHp" class="hp">100 HP</span></div><div class="track"><div id="blueFill" class="fill"></div></div></div>
     <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" hidden><strong id="shotSeconds">10</strong></div>
@@ -109,11 +124,10 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
   </div>
   <div id="ready" class="result">
     <strong id="tutorialSuccess" role="status" hidden>튜토리얼 성공</strong>
-    <span id="challengeIntro" class="challenge-text">세 판 연속 승리하면 클리어</span>
     <button id="begin" class="primary">게임 시작</button>
   </div>
-  <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><button id="rematch" class="primary">다시하기</button></div>
-  <span class="version">v0.76</span>
+  <div id="result" class="result" hidden><strong id="verdict" role="status"></strong><span id="resultProgress" class="challenge-text"></span><ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul><button id="rematch" class="primary">다시하기</button></div>
+  <span class="version">v0.77</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -136,7 +150,11 @@ const ctx = canvas.getContext('2d');
 const ready = document.querySelector('#ready');
 const beginButton = document.querySelector('#begin');
 const tutorialSuccess = document.querySelector('#tutorialSuccess');
-const challengeIntro = document.querySelector('#challengeIntro');
+const challengeHud = document.querySelector('#challengeHud');
+const challengeToggle = document.querySelector('#challengeToggle');
+const challengeList = document.querySelector('#challengeList');
+const resultChallenges = document.querySelector('#resultChallenges');
+const streak = document.querySelector('#streak');
 const result = document.querySelector('#result');
 const verdict = document.querySelector('#verdict');
 const rematchButton = document.querySelector('#rematch');
@@ -169,7 +187,6 @@ const JOYSTICK_CANCEL_CHARGE = .45;
 const CHARGE_SLOW_RATE = .20;
 const SHOT_WINDOW = 10;
 const PATH_PREVIEW_SECONDS = 2;
-const WINS_TO_CLEAR = 3;
 const TUTORIAL_HITS = 3;
 const PLAYER_STRIKE_INTERVAL = .72;
 const WALL_DAMAGE_SPEED = 180;
@@ -190,6 +207,17 @@ const ITEMS = {
   D: {name:'견고', color:'#e1b9ff', description:'다음 턴에 한 번은 적과 충돌하거나 폭발에 휘말려도 밀려나지 않습니다.'}
 };
 const itemTypes = Object.keys(ITEMS);
+const CHALLENGES = {
+  wins: '3번 승리하기',
+  heal: '회복 아이템으로 회복하기',
+  blast: '폭발 아이템으로 적 날려버리기',
+  sturdy: '견고 아이템 사용 중 적과 충돌하기',
+  protection: '보호 아이템 사용 중 적과 충돌하기',
+  healthyWin: 'HP 40 이상인 상태로 승리하기',
+  quickWin: '10턴 안에 승리하기',
+  noItemWin: '아이템을 사용하지 않고 승리하기',
+  itemTurnWin: '아이템을 사용한 턴에 승리하기'
+};
 const palette = [
   { light:'#a7efff', bright:'#64d5f4', mid:'#2d97b8', dark:'#174760', name:'교주의 팽이' },
   { light:'#ffceb4', bright:'#ff896b', mid:'#c75942', dark:'#623324', name:'칸타의 팽이' }
@@ -209,7 +237,8 @@ let lastTime, accumulator = 0;
 let gesture = null;
 let fastMode = false;
 let pendingDash = null;
-let challengeWins = 0;
+let winStreak = 0;
+let challenges = [];
 let tutorial = { stage: 'intro', wallHits: 0, enemyKnocked: false, nextAt: null };
 let fastModeTutorialDone = false;
 
@@ -232,7 +261,6 @@ function completeTutorial() {
   tutorial = null;
   tutorialPractice.hidden = true;
   tutorialSuccess.hidden = false;
-  challengeIntro.hidden = true;
   beginButton.textContent = '본 게임 시작';
   round.started = false;
   ready.hidden = false;
@@ -254,7 +282,8 @@ function resetRound(started = false) {
     elapsed: 0, started, enemyDashUntil: 0,
     playerDashUntil: 0, nextStrike: 0, shotTime: started && !tutorial ? SHOT_WINDOW : null,
     over: false, freeze: 0, shake: 0, mutualSturdyContact: false,
-    turn: 1, resolvingTurn: false, fieldItem: null, nextItemTurn: ITEM_INTERVAL, armedItem: null, itemDetailsOpen: false
+    turn: 1, resolvingTurn: false, fieldItem: null, nextItemTurn: ITEM_INTERVAL, armedItem: null, itemDetailsOpen: false,
+    usedItem: false, usedItemThisTurn: false, endsRun: false
   };
   sparks = [];
   hits = [];
@@ -263,6 +292,7 @@ function resetRound(started = false) {
   lastTime = undefined;
   ready.hidden = started || Boolean(tutorial) || !fastModeGuide.hidden;
   result.hidden = true;
+  challengeHud.hidden = !started && fastModeGuide.hidden;
   updateShotClock();
   updateHud();
   updateItemHud();
@@ -275,6 +305,36 @@ function updateHud() {
   });
 }
 
+function startRun() {
+  winStreak = 0;
+  const pool = Object.keys(CHALLENGES);
+  challenges = Array.from({length:3}, () => ({
+    id: pool.splice(Math.floor(Math.random() * pool.length), 1)[0], done: false
+  }));
+  challengeList.hidden = false;
+  challengeToggle.setAttribute('aria-expanded', 'true');
+  updateChallenges();
+  resetRound(true);
+}
+
+function renderChallenges(list) {
+  list.replaceChildren(...challenges.map(({id, done}) => {
+    const row = document.createElement('li');
+    const progress = id === 'wins' ? ' ' + Math.min(winStreak, 3) + '/3' : '';
+    row.textContent = (done ? '★ ' : '☆ ') + CHALLENGES[id] + progress;
+    row.classList.toggle('complete', done);
+    return row;
+  }));
+}
+
+function updateChallenges(...completed) {
+  for (const challenge of challenges) {
+    if (completed.includes(challenge.id)) challenge.done = true;
+  }
+  renderChallenges(challengeList);
+  streak.textContent = winStreak + '연승';
+}
+
 function finish() {
   if (round.over) return;
   round.over = true;
@@ -284,14 +344,24 @@ function finish() {
   const [blue, red] = tops;
   const winner = blue.hp === red.hp ? null : blue.hp > red.hp ? blue : red;
   const won = winner === blue;
-  challengeWins = won ? challengeWins + 1 : 0;
-  const cleared = challengeWins === WINS_TO_CLEAR;
-  verdict.textContent = cleared ? '게임 클리어!' : won ? '승리' : winner === red ? '패배' : '무승부';
-  resultProgress.textContent = won
-    ? challengeWins + ' / ' + WINS_TO_CLEAR + ' 승리'
-    : '첫 판부터 다시 시작';
-  rematchButton.textContent = cleared ? '처음부터' : won ? '다음 게임' : '다시하기';
-  verdict.style.color = cleared ? '#ffe4a0' : winner?.color.light || '#f3eee2';
+  round.endsRun = winner === red;
+  if (won) {
+    winStreak++;
+    updateChallenges(
+      winStreak >= 3 && 'wins',
+      blue.hp >= 40 && 'healthyWin',
+      round.turn <= 10 && 'quickWin',
+      !round.usedItem && 'noItemWin',
+      round.usedItemThisTurn && 'itemTurnWin'
+    );
+  }
+  verdict.textContent = round.endsRun ? '게임 종료' : won ? '승리' : '무승부';
+  resultProgress.textContent = (round.endsRun ? '최종 ' : '') + winStreak + '연승';
+  resultChallenges.hidden = !round.endsRun;
+  if (round.endsRun) renderChallenges(resultChallenges);
+  rematchButton.textContent = round.endsRun ? '다시하기' : '다음 게임';
+  verdict.style.color = winner?.color.light || '#f3eee2';
+  challengeHud.hidden = true;
   result.hidden = false;
 }
 
@@ -527,6 +597,8 @@ function collectItem(starts) {
 
 function activateItems(playerItem, enemyItem) {
   const effects = [playerItem, enemyItem];
+  round.usedItemThisTurn = Boolean(playerItem);
+  if (playerItem) round.usedItem = true;
   round.mutualSturdyContact = false;
   tops.forEach((top, i) => {
     const item = effects[i];
@@ -547,6 +619,7 @@ function activateItems(playerItem, enemyItem) {
       } else {
         launch(target, Math.atan2(dy, dx), BLAST_SPEED, 'idle');
         target.stagger = .46;
+        if (i === 0) updateChallenges('blast');
       }
     }
     showImpact(top.x, top.y, ITEMS.A.color);
@@ -557,7 +630,10 @@ function activateItems(playerItem, enemyItem) {
 
 function finishTurn() {
   for (const top of tops) {
-    if (top.effect === 'B' && top.hp > 0 && !top.damaged) top.hp = Math.min(MAX_HP, top.hp + 20);
+    if (top.effect === 'B' && top.hp > 0 && top.hp < MAX_HP && !top.damaged) {
+      top.hp = Math.min(MAX_HP, top.hp + 20);
+      if (top === tops[0]) updateChallenges('heal');
+    }
     top.effect = null;
   }
   round.resolvingTurn = false;
@@ -715,6 +791,8 @@ function collide() {
     b.y += ny * push * (anchoredA ? 1 : .5);
   }
   if (closing <= 0) return;
+  if (anchoredA) updateChallenges('sturdy');
+  if (a.effect === 'C' && !a.collided) updateChallenges('protection');
   a.collided = b.collided = true;
   // If both tops resist the same hit, let them separate before resolving another.
   round.mutualSturdyContact = anchoredA && anchoredB;
@@ -1225,6 +1303,10 @@ fastModeButton.addEventListener('click', () => {
   updateShotClock();
   updateItemHud();
 });
+challengeToggle.addEventListener('click', () => {
+  challengeList.hidden = !challengeList.hidden;
+  challengeToggle.setAttribute('aria-expanded', String(!challengeList.hidden));
+});
 useItemButton.addEventListener('click', () => {
   if (!canStrike() || tutorial || !tops[0].item) return;
   const item = tops[0].item;
@@ -1282,14 +1364,17 @@ tutorialConfirm.addEventListener('click', () => {
   tutorialConfirm.hidden = true;
   round.started = true;
 });
-beginButton.addEventListener('click', () => resetRound(true));
+beginButton.addEventListener('click', startRun);
 rematchButton.addEventListener('click', () => {
   if (!round.over) return;
-  if (challengeWins === 1 && !fastModeTutorialDone) {
+  if (round.endsRun) {
+    startRun();
+    return;
+  }
+  if (winStreak === 1 && !fastModeTutorialDone) {
     showFastModeTutorial();
     return;
   }
-  if (challengeWins === WINS_TO_CLEAR) challengeWins = 0;
   resetRound(true);
 });
 canvas.addEventListener('pointerdown', event => {
