@@ -14,7 +14,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .fighter-head{display:flex;align-items:center;justify-content:space-between;gap:4px}
 button{font-size:clamp(15px,3.1vh,19px);font-weight:750}
 .version{position:absolute;right:var(--hud-right);bottom:var(--bottom-inset);color:#f3eee2;opacity:.45;font-size:11px;font-weight:700;pointer-events:none}
-.score{position:absolute;inset:var(--hud-top) var(--hud-right) auto var(--hud-left);height:var(--score-height);display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:clamp(6px,2.5vw,32px);background:#1c2026;border:1px solid #353b40;padding:0 clamp(7px,2vw,24px);border-radius:12px;pointer-events:none}
+.score{position:absolute;inset:var(--hud-top) var(--hud-right) auto var(--hud-left);height:var(--score-height);display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr) auto;align-items:center;gap:clamp(4px,1.5vw,22px);background:#1c2026;border:1px solid #353b40;padding:0 clamp(7px,2vw,24px);border-radius:12px;pointer-events:none}
 .fighter{min-width:0;color:var(--blue)}
 .fighter.red{color:var(--red);text-align:right}
 .red .fighter-head{flex-direction:row-reverse}
@@ -23,10 +23,20 @@ button{font-size:clamp(15px,3.1vh,19px);font-weight:750}
 .track{height:clamp(5px,1.35vh,10px);background:#343943;border-radius:3px;margin-top:4px;overflow:hidden}
 .fill{height:100%;width:100%;background:currentColor;transition:width .18s ease}
 .red .fill{margin-left:auto}
-.shot-clock{display:flex;align-items:center;justify-content:center;min-width:clamp(38px,9vw,64px);padding:2px 4px;border:1px solid #62737d;border-radius:8px;background:#121a24e8;color:#c9e9f1;font-size:11px;font-weight:750;white-space:nowrap}
+.shot-clock{display:grid;place-items:center;width:clamp(32px,min(7vw,calc(var(--score-height) - 8px)),52px);aspect-ratio:1;border:1px solid #62737d;border-radius:50%;background:#121a24;color:#c9e9f1}
+.score-actions{display:flex;justify-content:flex-end;gap:var(--score-action-gap)}
+.score-actions[hidden],.score-button[hidden]{display:none}
+.score{--score-button-size:clamp(34px,min(7vw,calc(var(--score-height) - 8px)),48px);--score-action-gap:clamp(4px,1vw,8px)}
+.score-button{position:relative;pointer-events:auto;display:grid;place-items:center;width:var(--score-button-size);min-height:0;aspect-ratio:1;padding:0;border-radius:50%;font-size:clamp(17px,3.5vh,24px);line-height:1}
+.score .score-streak{margin:0;text-align:center;white-space:nowrap;font-size:clamp(13px,2.8vw,25px);font-variant-numeric:tabular-nums}
+.score-streak[hidden],.shot-clock[hidden]{visibility:hidden}
+.score-streak[hidden]{display:block}
+.pause-menu{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:clamp(16px,4vw,28px);border:1px solid #62737d;border-radius:16px;background:#18212c;color:#f3eee2;text-align:center}
+.pause-menu::backdrop{background:#0a0e15c9}
+.pause-menu h2{margin:0;font-size:clamp(24px,5vh,38px)}
+.pause-menu .challenge-list{text-align:left;margin:16px 0 20px}
 .shot-clock strong{font-size:clamp(22px,5.5vh,30px);font-weight:850;line-height:1;font-variant-numeric:tabular-nums}
 .shot-clock[data-urgent="true"]{color:#ffc087;border-color:#e08e64}
-.shot-clock[hidden]{display:flex;visibility:hidden}
 canvas{width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
 .result{position:absolute;inset:0;display:grid;place-content:center;text-align:center;justify-items:center;background:#0f13198e}
 .result[hidden]{display:none}
@@ -48,14 +58,9 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .primary{background:#ebe0bd;color:#202126;border-color:#ebe0bd}
 .primary:hover{background:#fff0c8}
 .hud-button{position:absolute;top:var(--hud-row);z-index:2;min-height:50px;padding:0 clamp(12px,2vw,18px);font-size:clamp(14px,2.7vh,17px);color:#ced8dc}
-.challenge-hud{position:absolute;top:var(--hud-row);right:var(--hud-right);text-align:right;pointer-events:none}
-.challenge-hud[hidden],.challenge-list[hidden]{display:none}
-.challenge-buttons{display:flex;justify-content:flex-end;gap:6px}
-.challenge-buttons .hud-button{position:relative;top:auto;pointer-events:auto;padding-inline:clamp(8px,2vw,18px)}
+.challenge-list[hidden]{display:none}
 .challenge-list{position:relative;z-index:2;display:grid;gap:4px;margin:6px 0;padding:0;list-style:none;color:#f3eee2;font-size:clamp(15px,3vh,19px);line-height:1.3;text-shadow:0 1px 3px #000,0 1px 4px #000}
 :is(.challenge-list,.result-stars) .complete{color:#ffe4a0}
-.challenge-hud .challenge-text{position:relative;z-index:2;text-shadow:0 1px 3px #000}
-#challengeToggle{font-size:clamp(16px,3vh,19px)}
 #result{z-index:3;padding:0 14px}
 #result .challenge-text{font-size:clamp(21px,4.7vh,34px)}
 #result .challenge-list{text-align:left;font-size:clamp(16px,3.4vh,22px)}
@@ -69,11 +74,11 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .item-effect{position:absolute;top:100%;left:0;z-index:1;width:min(265px,100%);margin:6px 0 0;padding:8px 10px;border:1px solid #62737d;background:#121a24ee;font-size:14px;line-height:1.4;pointer-events:auto}
 .item-status button{pointer-events:auto;white-space:normal}
 .stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3}
-.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.hud-button,.version,.fullscreen-status,.challenge-hud){filter:brightness(.32)}
+.stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.hud-button,.version,.fullscreen-status){filter:brightness(.32)}
 .item-status:has(#useItem[aria-expanded="true"]){z-index:4}
 #useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
 .item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
-.hud-button[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
+:is(.hud-button,.score-button)[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
 .fullscreen-status{position:absolute;top:calc(var(--hud-row) + 56px);left:var(--hud-left);max-width:calc(100% - var(--hud-left) - var(--hud-right));z-index:3;margin:0;padding:6px 9px;border-radius:8px;background:#121a24ee;font-size:12px;pointer-events:none}
 .fullscreen-status:empty{display:none}
 .stage:fullscreen{width:100%;height:100%}
@@ -85,7 +90,17 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .fast-mode-arrow{display:none}
 .stage:has(.fast-mode-guide:not([hidden])) .fast-mode-arrow{display:block;position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);color:var(--blue);font-size:32px;line-height:1;pointer-events:none}
 @media(max-width:480px){.tutorial{top:calc(var(--hud-row) + 56px);left:var(--hud-left);right:var(--hud-right)}}
-@media(max-width:420px){.fighter-head{flex-wrap:wrap;row-gap:0}}
+@media(max-width:540px){
+  .fighter-head,.red .fighter-head{flex-direction:column;align-items:flex-start;gap:1px}
+  .red .fighter-head{align-items:flex-end}
+  .name{font-size:clamp(9px,2.6vw,14px)}
+  .hp{font-size:clamp(10px,2.6vw,13px)}
+  .shot-clock strong{font-size:clamp(17px,4vw,24px)}
+}
+@media(min-width:360px){
+  .score{--score-edge:calc(2 * var(--score-button-size) + var(--score-action-gap));grid-template-columns:var(--score-edge) minmax(0,1fr) auto minmax(0,1fr) var(--score-edge)}
+}
+@media(max-width:320px){.score{gap:3px;padding-inline:5px}.name{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.fill{transition:none}}
 </style>
 </head>
@@ -94,19 +109,21 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
   <canvas id="arena" aria-label="경기장. 터치한 곳을 기준으로 원하는 방향으로 밀었다 놓으면 두 팽이가 돌진합니다."></canvas>
   <button type="button" id="fullscreen" class="hud-button fullscreen" aria-pressed="false">전체 화면</button>
   <p id="fullscreenStatus" class="fullscreen-status" role="status"></p>
-  <div id="challengeHud" class="challenge-hud" hidden>
-    <div class="challenge-buttons">
-      <button type="button" id="fastMode" class="hud-button fast-mode" aria-pressed="false" hidden>배속 모드<span class="fast-mode-arrow" aria-hidden="true">↑</span></button>
-      <button type="button" id="challengeToggle" class="hud-button" aria-expanded="true" aria-controls="challengeList">도전 과제</button>
-    </div>
-    <ul id="challengeList" class="challenge-list" aria-label="도전 과제" aria-live="polite"></ul>
-    <span id="streak" class="challenge-text"></span>
-  </div>
   <section class="score" aria-label="대전 현황">
-    <div class="fighter"><div class="fighter-head"><span class="name">교주의 팽이</span><span id="blueHp" class="hp">100 HP</span></div><div class="track"><div id="blueFill" class="fill"></div></div></div>
     <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" hidden><strong id="shotSeconds">10</strong></div>
+    <div class="fighter"><div class="fighter-head"><span class="name">교주의 팽이</span><span id="blueHp" class="hp">100 HP</span></div><div class="track"><div id="blueFill" class="fill"></div></div></div>
+    <span id="streak" class="challenge-text score-streak" hidden>0연승</span>
     <div class="fighter red"><div class="fighter-head"><span class="name">칸타의 팽이</span><span id="redHp" class="hp">100 HP</span></div><div class="track"><div id="redFill" class="fill"></div></div></div>
+    <div id="scoreActions" class="score-actions" hidden>
+      <button type="button" id="fastMode" class="score-button fast-mode" aria-label="배속 모드" title="배속 모드" aria-pressed="false"><span aria-hidden="true">»</span><span class="fast-mode-arrow" aria-hidden="true">↑</span></button>
+      <button type="button" id="pause" class="score-button" aria-label="일시 정지" title="일시 정지" aria-haspopup="dialog"><span aria-hidden="true">Ⅱ</span></button>
+    </div>
   </section>
+  <dialog id="pauseMenu" class="pause-menu" aria-labelledby="pauseTitle">
+    <h2 id="pauseTitle">일시 정지</h2>
+    <ul id="challengeList" class="challenge-list" aria-label="도전 과제 현황"></ul>
+    <button id="resume" type="button" class="primary" autofocus>게임 재개</button>
+  </dialog>
   <div id="itemStatus" class="item-status" hidden>
     <button id="useItem" type="button" aria-expanded="false" aria-controls="itemEffect">아이템 없음</button>
     <p id="itemEffect" class="item-effect" hidden></p>
@@ -137,7 +154,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.78</span>
+  <span class="version">v0.79</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -160,8 +177,10 @@ const ctx = canvas.getContext('2d');
 const ready = document.querySelector('#ready');
 const beginButton = document.querySelector('#begin');
 const tutorialSuccess = document.querySelector('#tutorialSuccess');
-const challengeHud = document.querySelector('#challengeHud');
-const challengeToggle = document.querySelector('#challengeToggle');
+const scoreActions = document.querySelector('#scoreActions');
+const pauseButton = document.querySelector('#pause');
+const pauseMenu = document.querySelector('#pauseMenu');
+const resumeButton = document.querySelector('#resume');
 const challengeList = document.querySelector('#challengeList');
 const resultChallenges = document.querySelector('#resultChallenges');
 const resultStars = document.querySelector('#resultStars');
@@ -303,7 +322,8 @@ function resetRound(started = false) {
   lastTime = undefined;
   ready.hidden = started || Boolean(tutorial) || !fastModeGuide.hidden;
   result.hidden = true;
-  challengeHud.hidden = !started && fastModeGuide.hidden;
+  scoreActions.hidden = (!started || Boolean(tutorial)) && fastModeGuide.hidden;
+  pauseButton.hidden = streak.hidden = !started || Boolean(tutorial);
   updateShotClock();
   updateHud();
   updateItemHud();
@@ -322,8 +342,6 @@ function startRun() {
   challenges = Array.from({length:3}, () => ({
     id: pool.splice(Math.floor(Math.random() * pool.length), 1)[0], done: false
   }));
-  challengeList.hidden = false;
-  challengeToggle.setAttribute('aria-expanded', 'true');
   updateChallenges();
   resetRound(true);
 }
@@ -342,7 +360,6 @@ function updateChallenges(...completed) {
   for (const challenge of challenges) {
     if (completed.includes(challenge.id)) challenge.done = true;
   }
-  renderChallenges(challengeList);
   streak.textContent = winStreak + '연승';
 }
 
@@ -383,7 +400,7 @@ function finish() {
   }
   rematchButton.textContent = round.endsRun ? '다시하기' : '다음 게임';
   verdict.style.color = winner?.color.light || '#f3eee2';
-  challengeHud.hidden = true;
+  scoreActions.hidden = true;
   result.hidden = false;
 }
 
@@ -444,7 +461,7 @@ function keepInside(top, duringPlay = false) {
 }
 
 function canStrike() {
-  return round.started && !round.over && !pendingDash && (!tutorial || tutorial.nextAt === null) && tops.every(top => top.hp > 0)
+  return round.started && !round.over && !pauseMenu.open && !pendingDash && (!tutorial || tutorial.nextAt === null) && tops.every(top => top.hp > 0)
     && !round.resolvingTurn && round.elapsed >= round.nextStrike;
 }
 
@@ -1262,6 +1279,10 @@ function resize() {
 function frame(now) {
   const seconds = Math.max(0, (now - (lastTime ?? now)) / 1000);
   lastTime = now;
+  if (pauseMenu.open) {
+    requestAnimationFrame(frame);
+    return;
+  }
   if (pendingDash) {
     pendingDash.remaining -= seconds;
     if (pendingDash.remaining <= 0) releasePreview();
@@ -1306,7 +1327,6 @@ document.addEventListener('fullscreenchange', () => {
 function showFastModeTutorial() {
   setFastMode(false);
   fastModeGuide.hidden = false;
-  fastModeButton.hidden = false;
   canvas.inert = true;
   resetRound();
   fastModeButton.setAttribute('aria-describedby', 'fastModeGuide');
@@ -1315,19 +1335,28 @@ function showFastModeTutorial() {
 
 fastModeButton.addEventListener('click', () => {
   setFastMode(!fastMode);
-  if (fastModeGuide.hidden) return;
   fastModeTutorialDone = true;
+  if (fastModeGuide.hidden) return;
   fastModeGuide.hidden = true;
   canvas.inert = false;
   fastModeButton.removeAttribute('aria-describedby');
   round.started = true;
   round.shotTime = SHOT_WINDOW;
+  pauseButton.hidden = streak.hidden = false;
   updateShotClock();
   updateItemHud();
 });
-challengeToggle.addEventListener('click', () => {
-  challengeList.hidden = !challengeList.hidden;
-  challengeToggle.setAttribute('aria-expanded', String(!challengeList.hidden));
+pauseButton.addEventListener('click', () => {
+  if (tutorial || !round.started || round.over || pauseMenu.open) return;
+  gesture = null;
+  renderChallenges(challengeList);
+  pauseMenu.showModal();
+  draw();
+});
+resumeButton.addEventListener('click', () => pauseMenu.close());
+pauseMenu.addEventListener('close', () => {
+  lastTime = undefined;
+  pauseButton.focus({preventScroll: true});
 });
 useItemButton.addEventListener('click', () => {
   if (!canStrike() || tutorial || !tops[0].item) return;
@@ -1377,7 +1406,6 @@ tutorialSkip.addEventListener('click', () => {
   tutorial = null;
   tutorialIntro.hidden = true;
   fastModeTutorialDone = true;
-  fastModeButton.hidden = false;
   resetRound();
   beginButton.focus();
 });
