@@ -34,7 +34,9 @@ button{font-size:clamp(15px,3.1vh,19px);font-weight:750}
 .pause-menu{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:clamp(16px,4vw,28px);border:1px solid #62737d;border-radius:16px;background:#18212c;color:#f3eee2;text-align:center}
 .pause-menu::backdrop{background:#0a0e15c9}
 .pause-menu h2{margin:0;font-size:clamp(24px,5vh,38px)}
-.pause-menu .challenge-list{text-align:left;margin:16px 0 20px}
+.pause-menu .challenge-list{text-align:left;margin:16px 0 6px}
+.challenge-note{max-width:36rem;margin:0 0 6px;color:#bec8d3;font-size:clamp(11px,2.4vh,14px);line-height:1.4}
+.pause-menu .challenge-note{margin-bottom:16px}
 .shot-clock strong{font-size:clamp(22px,5.5vh,30px);font-weight:850;line-height:1;font-variant-numeric:tabular-nums}
 .shot-clock[data-urgent="true"]{color:#ffc087;border-color:#e08e64}
 canvas{width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
@@ -127,6 +129,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
   <dialog id="pauseMenu" class="pause-menu" aria-labelledby="pauseTitle">
     <h2 id="pauseTitle">일시 정지</h2>
     <ul id="challengeList" class="challenge-list" aria-label="도전 과제 현황"></ul>
+    <p class="challenge-note">도전과제는 게임이 종료될 때까지 유지되며, 새로운 게임을 시작하면 무작위로 제공됩니다</p>
     <div class="pause-actions">
       <button id="fullscreen" type="button">전체 화면</button>
       <button id="resume" type="button" class="primary" autofocus>게임 재개</button>
@@ -160,12 +163,14 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <strong id="verdict" role="status"></strong>
     <div id="resultStars" class="result-stars" role="img" hidden></div>
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
+    <p id="resultChallengeNote" class="challenge-note" hidden>도전과제는 게임이 종료될 때까지 유지되며, 새로운 게임을 시작하면 무작위로 제공됩니다</p>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.86</span>
+  <span class="version">v0.87</span>
   <div id="itemGuide" class="control-guide" hidden>
     <div class="tutorial-copy">
       <strong>얻은 아이템은 이 곳에 보관됩니다.</strong>
+      <span>아이템은 턴 준비 시간에 사용할 수 있습니다.</span>
       <span>아이템을 터치하여 진행</span>
     </div>
   </div>
@@ -196,6 +201,7 @@ const pauseMenu = document.querySelector('#pauseMenu');
 const resumeButton = document.querySelector('#resume');
 const challengeList = document.querySelector('#challengeList');
 const resultChallenges = document.querySelector('#resultChallenges');
+const resultChallengeNote = document.querySelector('#resultChallengeNote');
 const resultStars = document.querySelector('#resultStars');
 const streak = document.querySelector('#streak');
 const result = document.querySelector('#result');
@@ -401,20 +407,22 @@ function finish() {
   }
   verdict.textContent = round.endsRun ? '게임 종료' : won ? '승리' : '무승부';
   resultProgress.textContent = (round.endsRun ? '최종 ' : '') + winStreak + '연승';
-  result.prepend(round.endsRun ? resultProgress : verdict);
-  resultStars.hidden = resultChallenges.hidden = !round.endsRun;
-  if (round.endsRun) {
-    resultStars.replaceChildren(...challenges.map(({done}) => {
+  const showChallenges = won || round.endsRun;
+  result.prepend(showChallenges ? resultProgress : verdict);
+  resultStars.hidden = resultChallenges.hidden = resultChallengeNote.hidden = !showChallenges;
+  if (showChallenges) {
+    const completed = challenges.filter(challenge => challenge.done).length;
+    resultStars.replaceChildren(...challenges.map((_, index) => {
       const star = document.createElement('span');
-      star.textContent = done ? '★' : '☆';
-      star.classList.toggle('complete', done);
+      const filled = index < completed;
+      star.textContent = filled ? '★' : '☆';
+      star.classList.toggle('complete', filled);
       return star;
     }));
-    const completed = challenges.filter(challenge => challenge.done).length;
     resultStars.setAttribute('aria-label', '도전 과제 ' + challenges.length + '개 중 ' + completed + '개 달성');
     renderChallenges(resultChallenges);
   }
-  rematchButton.textContent = round.endsRun ? '다시하기' : '다음 게임';
+  rematchButton.textContent = round.endsRun ? '다시하기' : won ? '계속하기' : '다음 게임';
   verdict.style.color = winner?.color.light || '#f3eee2';
   pauseButton.disabled = fastModeButton.disabled = true;
   result.hidden = false;
