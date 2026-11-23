@@ -70,7 +70,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .item-turn[hidden]{display:block;visibility:hidden}
 .item-status{position:absolute;bottom:var(--bottom-inset);left:var(--hud-left);z-index:2;pointer-events:none}
 .item-status[hidden]{display:none}
-.item-effect{position:absolute;bottom:100%;left:0;z-index:1;width:min(265px,calc(100vw - var(--hud-left) - var(--hud-right)));margin:0 0 8px;padding:8px 10px;border:1px solid #62737d;border-radius:8px;background:#121a24ee;color:#eee3c9;font-size:14px;line-height:1.4;pointer-events:auto}
+.item-effect{position:absolute;bottom:0;left:calc(100% + 8px);z-index:1;width:min(265px,calc(100vw - var(--hud-left) - var(--hud-right) - 100% - 8px));margin:0;padding:8px 10px;border:1px solid #62737d;border-radius:8px;background:#121a24ee;color:#eee3c9;font-size:14px;line-height:1.4;pointer-events:auto}
 .item-slot{display:grid;place-items:center;width:clamp(58px,12vw,80px);min-height:0;aspect-ratio:1;padding:0;border-radius:14px;pointer-events:auto}
 .item-slot:disabled{cursor:default;background:#242930}
 .item-slot[aria-pressed="true"]{border-color:#f9dc91;background:#383326}
@@ -162,7 +162,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.85</span>
+  <span class="version">v0.86</span>
   <div id="itemGuide" class="control-guide" hidden>
     <div class="tutorial-copy">
       <strong>얻은 아이템은 이 곳에 보관됩니다.</strong>
