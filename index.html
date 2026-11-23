@@ -83,13 +83,16 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .fullscreen-status{margin:10px 0 0;color:#ffc087;font-size:14px}
 .fullscreen-status:empty{display:none}
 .stage:fullscreen{width:100%;height:100%}
-.fast-mode-guide{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:16px;background:#000c;text-align:center}
-.fast-mode-guide[hidden]{display:none}
-.fast-mode-guide .tutorial-copy{gap:6px}
-.fast-mode-guide small{color:var(--muted);font-size:.85em}
-.stage:has(.fast-mode-guide:not([hidden])) .fast-mode{z-index:6;outline:2px solid var(--blue);outline-offset:3px}
+.control-guide{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:16px;background:#000c;text-align:center}
+.control-guide[hidden]{display:none}
+.control-guide .tutorial-copy{gap:6px}
+.control-guide small{color:var(--muted);font-size:.85em}
+.stage:has(#fastModeGuide:not([hidden])) .fast-mode{z-index:6;outline:2px solid var(--blue);outline-offset:3px}
 .fast-mode-arrow{display:none}
-.stage:has(.fast-mode-guide:not([hidden])) .fast-mode-arrow{display:block;position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);color:var(--blue);font-size:32px;line-height:1;pointer-events:none}
+.stage:has(#fastModeGuide:not([hidden])) .fast-mode-arrow{display:block;position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);color:var(--blue);font-size:32px;line-height:1;pointer-events:none}
+.stage:has(#itemGuide:not([hidden])) .item-status{z-index:6}
+.stage:has(#itemGuide:not([hidden])) .item-slot{outline:2px solid var(--blue);outline-offset:3px}
+.stage:has(#itemGuide:not([hidden])) .item-slot::after{content:"↓";position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);color:var(--blue);font-size:32px;line-height:1;pointer-events:none}
 @media(max-width:480px){.tutorial{top:calc(var(--hud-row) + 56px);left:var(--hud-left);right:var(--hud-right)}}
 @media(max-width:540px){
   .fighter-head,.red .fighter-head{flex-direction:column;align-items:flex-start;gap:1px}
@@ -159,8 +162,14 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.82</span>
-  <div id="fastModeGuide" class="fast-mode-guide" hidden>
+  <span class="version">v0.83</span>
+  <div id="itemGuide" class="control-guide" hidden>
+    <div class="tutorial-copy">
+      <strong>얻은 아이템은 이 곳에 보관됩니다.</strong>
+      <span>아이템을 터치하여 진행</span>
+    </div>
+  </div>
+  <div id="fastModeGuide" class="control-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
       <span>배속 모드 버튼을 눌러서 배속 모드를 활성화하여 진행하기</span>
@@ -195,6 +204,7 @@ const rematchButton = document.querySelector('#rematch');
 const shotClock = document.querySelector('#shotClock');
 const shotSeconds = document.querySelector('#shotSeconds');
 const itemStatus = document.querySelector('#itemStatus');
+const itemGuide = document.querySelector('#itemGuide');
 const useItemButton = document.querySelector('#useItem');
 const itemEffect = document.querySelector('#itemEffect');
 const itemTurn = document.querySelector('#itemTurn');
@@ -275,6 +285,7 @@ let winStreak = 0;
 let challenges = [];
 let tutorial = { stage: 'intro', wallHits: 0, enemyKnocked: false, nextAt: null };
 let fastModeTutorialDone = false;
+let itemTutorialDone = false;
 
 function showTutorialConfirmation() {
   gesture = null;
@@ -466,7 +477,7 @@ function keepInside(top, duringPlay = false) {
 }
 
 function canStrike() {
-  return round.started && !round.over && !pauseMenu.open && !pendingDash && (!tutorial || tutorial.nextAt === null) && tops.every(top => top.hp > 0)
+  return round.started && !round.over && !pauseMenu.open && itemGuide.hidden && !pendingDash && (!tutorial || tutorial.nextAt === null) && tops.every(top => top.hp > 0)
     && !round.resolvingTurn && round.elapsed >= round.nextStrike;
 }
 
@@ -583,7 +594,7 @@ function updateItemHud() {
   useItemButton.textContent = playerItem?.name ?? '';
   const itemLabel = armed ? playerItem.name + ' 사용 예약 취소'
     : playerItem ? playerItem.name + ' 사용' : '아이템 없음';
-  useItemButton.setAttribute('aria-label', itemLabel);
+  useItemButton.setAttribute('aria-label', itemGuide.hidden ? itemLabel : '아이템 칸');
   useItemButton.setAttribute('aria-expanded', String(expanded));
   useItemButton.setAttribute('aria-pressed', String(armed));
   itemEffect.hidden = !expanded;
@@ -946,7 +957,10 @@ function step(dt) {
     for (const top of tops) top.vx = top.vy = 0;
     finishTurn();
     round.turn++;
-    if (!round.fieldItem && round.turn >= round.nextItemTurn) spawnItem();
+    if (!round.fieldItem && round.turn >= round.nextItemTurn) {
+      spawnItem();
+      if (round.fieldItem && !itemTutorialDone) showItemTutorial();
+    }
     updateItemHud();
   }
 }
@@ -1144,7 +1158,7 @@ function drawJoystick() {
 
 function updateShotClock() {
   const visible = canStrike() && round.shotTime !== null;
-  useItemButton.disabled = !visible || !tops[0].item;
+  useItemButton.disabled = itemGuide.hidden && (!visible || !tops[0].item);
   shotSeconds.hidden = !visible;
   shotClock.setAttribute('aria-hidden', String(!visible));
   shotClock.dataset.urgent = String(visible && round.shotTime <= 2);
@@ -1288,7 +1302,7 @@ function resize() {
 function frame(now) {
   const seconds = Math.max(0, (now - (lastTime ?? now)) / 1000);
   lastTime = now;
-  if (pauseMenu.open) {
+  if (pauseMenu.open || !itemGuide.hidden) {
     requestAnimationFrame(frame);
     return;
   }
@@ -1297,7 +1311,7 @@ function frame(now) {
     if (pendingDash.remaining <= 0) releasePreview();
   } else {
     accumulator += Math.min(seconds, .05) * (gesture ? CHARGE_SLOW_RATE : 1);
-    while (accumulator >= FIXED_STEP) {
+    while (accumulator >= FIXED_STEP && itemGuide.hidden) {
       accumulator -= FIXED_STEP;
       step(FIXED_STEP);
     }
@@ -1339,8 +1353,17 @@ document.addEventListener('fullscreenchange', () => {
   fullscreenButton.textContent = document.fullscreenElement === stage ? '전체 화면 해제' : '전체 화면';
 });
 
+function showItemTutorial() {
+  gesture = null;
+  itemGuide.hidden = false;
+  canvas.inert = true;
+  pauseButton.disabled = fastModeButton.disabled = true;
+  useItemButton.disabled = false;
+  useItemButton.setAttribute('aria-describedby', 'itemGuide');
+  useItemButton.focus({preventScroll: true});
+}
+
 function showFastModeTutorial() {
-  setFastMode(false);
   fastModeGuide.hidden = false;
   canvas.inert = true;
   resetRound();
@@ -1349,9 +1372,12 @@ function showFastModeTutorial() {
 }
 
 fastModeButton.addEventListener('click', () => {
-  setFastMode(!fastMode);
+  if (fastModeGuide.hidden) {
+    setFastMode(!fastMode);
+    return;
+  }
+  setFastMode(true);
   fastModeTutorialDone = true;
-  if (fastModeGuide.hidden) return;
   fastModeGuide.hidden = true;
   canvas.inert = false;
   fastModeButton.removeAttribute('aria-describedby');
@@ -1375,6 +1401,17 @@ pauseMenu.addEventListener('close', () => {
   pauseButton.focus({preventScroll: true});
 });
 useItemButton.addEventListener('click', () => {
+  if (!itemGuide.hidden) {
+    itemTutorialDone = true;
+    itemGuide.hidden = true;
+    canvas.inert = false;
+    pauseButton.disabled = fastModeButton.disabled = false;
+    useItemButton.removeAttribute('aria-describedby');
+    lastTime = undefined;
+    updateItemHud();
+    updateShotClock();
+    return;
+  }
   if (!canStrike() || tutorial || !tops[0].item) return;
   const item = tops[0].item;
   if (round.armedItem) {
@@ -1421,7 +1458,6 @@ tutorialSkip.addEventListener('click', () => {
   if (tutorialIntro.hidden) return;
   tutorial = null;
   tutorialIntro.hidden = true;
-  fastModeTutorialDone = true;
   resetRound();
   beginButton.focus();
 });
