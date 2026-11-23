@@ -162,7 +162,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.84</span>
+  <span class="version">v0.85</span>
   <div id="itemGuide" class="control-guide" hidden>
     <div class="tutorial-copy">
       <strong>얻은 아이템은 이 곳에 보관됩니다.</strong>
@@ -650,7 +650,6 @@ function collectItem(starts) {
   owner.item = item.type;
   round.fieldItem = null;
   round.nextItemTurn = round.turn + ITEM_INTERVAL;
-  if (owner === tops[0] && !itemTutorialDone) showItemTutorial();
   updateItemHud();
 }
 
@@ -959,6 +958,7 @@ function step(dt) {
     finishTurn();
     round.turn++;
     if (!round.fieldItem && round.turn >= round.nextItemTurn) spawnItem();
+    if (tops[0].item && !itemTutorialDone) showItemTutorial();
     updateItemHud();
   }
 }
