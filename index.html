@@ -25,11 +25,11 @@ button{font-size:clamp(15px,3.1vh,19px);font-weight:750}
 .red .fill{margin-left:auto}
 .shot-clock{display:grid;place-items:center;width:clamp(32px,min(7vw,calc(var(--score-height) - 8px)),52px);aspect-ratio:1;border:1px solid #62737d;border-radius:50%;background:#121a24;color:#c9e9f1}
 .score-actions{display:flex;justify-content:flex-end;gap:var(--score-action-gap)}
-.score-actions[hidden],.score-button[hidden]{display:none}
+.score-button:disabled{opacity:.6;cursor:default;background:#242930}
 .score{--score-button-size:clamp(34px,min(7vw,calc(var(--score-height) - 8px)),48px);--score-action-gap:clamp(4px,1vw,8px)}
 .score-button{position:relative;pointer-events:auto;display:grid;place-items:center;width:var(--score-button-size);min-height:0;aspect-ratio:1;padding:0;border-radius:50%;font-size:clamp(17px,3.5vh,24px);line-height:1}
 .score .score-streak{margin:0;text-align:center;white-space:nowrap;font-size:clamp(13px,2.8vw,25px);font-variant-numeric:tabular-nums}
-.score-streak[hidden],.shot-clock[hidden]{visibility:hidden}
+.score-streak[hidden]{visibility:hidden}
 .score-streak[hidden]{display:block}
 .pause-menu{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:clamp(16px,4vw,28px);border:1px solid #62737d;border-radius:16px;background:#18212c;color:#f3eee2;text-align:center}
 .pause-menu::backdrop{background:#0a0e15c9}
@@ -77,7 +77,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 #useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
 .item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
 .score-button[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
-.pause-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.pause-actions{display:grid;justify-content:center;gap:8px}
 .fullscreen-status{margin:10px 0 0;color:#ffc087;font-size:14px}
 .fullscreen-status:empty{display:none}
 .stage:fullscreen{width:100%;height:100%}
@@ -107,21 +107,21 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 <main class="stage" aria-label="팽이 치기">
   <canvas id="arena" aria-label="경기장. 터치한 곳을 기준으로 원하는 방향으로 밀었다 놓으면 두 팽이가 돌진합니다."></canvas>
   <section class="score" aria-label="대전 현황">
-    <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" hidden><strong id="shotSeconds">10</strong></div>
+    <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" aria-hidden="true"><strong id="shotSeconds" hidden>10</strong></div>
     <div class="fighter"><div class="fighter-head"><span class="name">교주의 팽이</span><span id="blueHp" class="hp">100 HP</span></div><div class="track"><div id="blueFill" class="fill"></div></div></div>
     <span id="streak" class="challenge-text score-streak" hidden>0연승</span>
     <div class="fighter red"><div class="fighter-head"><span class="name">칸타의 팽이</span><span id="redHp" class="hp">100 HP</span></div><div class="track"><div id="redFill" class="fill"></div></div></div>
-    <div id="scoreActions" class="score-actions" hidden>
-      <button type="button" id="fastMode" class="score-button fast-mode" aria-label="배속 모드" title="배속 모드" aria-pressed="false"><span aria-hidden="true">»</span><span class="fast-mode-arrow" aria-hidden="true">↑</span></button>
-      <button type="button" id="pause" class="score-button" aria-label="일시 정지" title="일시 정지" aria-haspopup="dialog"><span aria-hidden="true">Ⅱ</span></button>
+    <div class="score-actions">
+      <button type="button" id="fastMode" class="score-button fast-mode" aria-label="배속 모드" title="배속 모드" aria-pressed="false" disabled><span aria-hidden="true">»</span><span class="fast-mode-arrow" aria-hidden="true">↑</span></button>
+      <button type="button" id="pause" class="score-button" aria-label="일시 정지" title="일시 정지" aria-haspopup="dialog" disabled><span aria-hidden="true">Ⅱ</span></button>
     </div>
   </section>
   <dialog id="pauseMenu" class="pause-menu" aria-labelledby="pauseTitle">
     <h2 id="pauseTitle">일시 정지</h2>
     <ul id="challengeList" class="challenge-list" aria-label="도전 과제 현황"></ul>
     <div class="pause-actions">
-      <button id="resume" type="button" class="primary" autofocus>게임 재개</button>
       <button id="fullscreen" type="button">전체 화면</button>
+      <button id="resume" type="button" class="primary" autofocus>게임 재개</button>
     </div>
     <p id="fullscreenStatus" class="fullscreen-status" role="status"></p>
   </dialog>
@@ -155,7 +155,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.80</span>
+  <span class="version">v0.81</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -178,7 +178,6 @@ const ctx = canvas.getContext('2d');
 const ready = document.querySelector('#ready');
 const beginButton = document.querySelector('#begin');
 const tutorialSuccess = document.querySelector('#tutorialSuccess');
-const scoreActions = document.querySelector('#scoreActions');
 const pauseButton = document.querySelector('#pause');
 const pauseMenu = document.querySelector('#pauseMenu');
 const resumeButton = document.querySelector('#resume');
@@ -323,8 +322,9 @@ function resetRound(started = false) {
   lastTime = undefined;
   ready.hidden = started || Boolean(tutorial) || !fastModeGuide.hidden;
   result.hidden = true;
-  scoreActions.hidden = (!started || Boolean(tutorial)) && fastModeGuide.hidden;
-  pauseButton.hidden = streak.hidden = !started || Boolean(tutorial);
+  streak.hidden = !started || Boolean(tutorial);
+  pauseButton.disabled = streak.hidden;
+  fastModeButton.disabled = pauseButton.disabled && fastModeGuide.hidden;
   updateShotClock();
   updateHud();
   updateItemHud();
@@ -401,7 +401,7 @@ function finish() {
   }
   rematchButton.textContent = round.endsRun ? '다시하기' : '다음 게임';
   verdict.style.color = winner?.color.light || '#f3eee2';
-  scoreActions.hidden = true;
+  pauseButton.disabled = fastModeButton.disabled = true;
   result.hidden = false;
 }
 
@@ -1138,11 +1138,12 @@ function drawJoystick() {
 function updateShotClock() {
   const visible = canStrike() && round.shotTime !== null;
   useItemButton.disabled = !visible || !tops[0].item;
-  shotClock.hidden = !visible;
+  shotSeconds.hidden = !visible;
+  shotClock.setAttribute('aria-hidden', String(!visible));
+  shotClock.dataset.urgent = String(visible && round.shotTime <= 2);
   if (!visible) return;
   const seconds = String(Math.ceil(round.shotTime));
   if (shotSeconds.textContent !== seconds) shotSeconds.textContent = seconds;
-  shotClock.dataset.urgent = String(round.shotTime <= 2);
 }
 
 function updateShotWindow(seconds) {
@@ -1349,7 +1350,7 @@ fastModeButton.addEventListener('click', () => {
   fastModeButton.removeAttribute('aria-describedby');
   round.started = true;
   round.shotTime = SHOT_WINDOW;
-  pauseButton.hidden = streak.hidden = false;
+  pauseButton.disabled = streak.hidden = false;
   updateShotClock();
   updateItemHud();
 });
