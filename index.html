@@ -65,17 +65,19 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 #result .challenge-list{text-align:left;font-size:clamp(16px,3.4vh,22px)}
 .result-stars{display:flex;gap:.18em;margin:4px 0;font-size:clamp(29px,6.5vh,48px);line-height:1;color:#f3eee2}
 .result-stars[hidden]{display:none}
-.item-status{position:absolute;inset:auto var(--hud-right) calc(var(--bottom-inset) + 86px) var(--hud-left);z-index:2;pointer-events:none}
+.score-leading{display:flex;align-items:center;gap:clamp(3px,1vw,10px)}
+.item-turn{font-size:clamp(11px,2.5vw,17px);font-weight:750;color:#eee3c9;white-space:nowrap;font-variant-numeric:tabular-nums}
+.item-turn[hidden]{display:block;visibility:hidden}
+.item-status{position:absolute;bottom:var(--bottom-inset);left:var(--hud-left);z-index:2;pointer-events:none}
 .item-status[hidden]{display:none}
-.item-turn,.item-effect{padding:5px 8px;border-radius:6px;background:#151a22f2;color:#eee3c9;font-size:12px}
-.item-turn{position:absolute;right:0;top:calc(100% + 42px)}
-.item-effect{position:absolute;top:100%;left:0;z-index:1;width:min(265px,100%);margin:6px 0 0;padding:8px 10px;border:1px solid #62737d;background:#121a24ee;font-size:14px;line-height:1.4;pointer-events:auto}
-.item-status button{pointer-events:auto;white-space:normal}
+.item-effect{position:absolute;bottom:100%;left:0;z-index:1;width:min(265px,calc(100vw - var(--hud-left) - var(--hud-right)));margin:0 0 8px;padding:8px 10px;border:1px solid #62737d;border-radius:8px;background:#121a24ee;color:#eee3c9;font-size:14px;line-height:1.4;pointer-events:auto}
+.item-slot{display:grid;place-items:center;width:clamp(58px,12vw,80px);min-height:0;aspect-ratio:1;padding:0;border-radius:14px;pointer-events:auto}
+.item-slot:disabled{cursor:default;background:#242930}
+.item-slot[aria-pressed="true"]{border-color:#f9dc91;background:#383326}
 .stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"])::after{content:"";position:absolute;inset:0;z-index:3}
 .stage:has(.item-status:not([hidden]) #useItem[aria-expanded="true"]) > :is(.score,.version){filter:brightness(.32)}
 .item-status:has(#useItem[aria-expanded="true"]){z-index:4}
 #useItem[aria-expanded="true"]{outline:2px solid #f9dc91;outline-offset:2px}
-.item-status:has(#useItem[aria-expanded="true"]) .item-turn{filter:brightness(.32)}
 .score-button[aria-pressed="true"]{background:#183947;border-color:#64d5f4;color:#d3f4ff}
 .pause-actions{display:grid;justify-content:center;gap:8px}
 .fullscreen-status{margin:10px 0 0;color:#ffc087;font-size:14px}
@@ -107,7 +109,10 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 <main class="stage" aria-label="팽이 치기">
   <canvas id="arena" aria-label="경기장. 터치한 곳을 기준으로 원하는 방향으로 밀었다 놓으면 두 팽이가 돌진합니다."></canvas>
   <section class="score" aria-label="대전 현황">
-    <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" aria-hidden="true"><strong id="shotSeconds" hidden>10</strong></div>
+    <div class="score-leading">
+      <div id="shotClock" class="shot-clock" role="timer" aria-label="팽이를 치기까지 남은 초" aria-hidden="true"><strong id="shotSeconds" hidden>10</strong></div>
+      <span id="itemTurn" class="item-turn" hidden>1턴</span>
+    </div>
     <div class="fighter"><div class="fighter-head"><span class="name">교주의 팽이</span><span id="blueHp" class="hp">100 HP</span></div><div class="track"><div id="blueFill" class="fill"></div></div></div>
     <span id="streak" class="challenge-text score-streak" hidden>0연승</span>
     <div class="fighter red"><div class="fighter-head"><span class="name">칸타의 팽이</span><span id="redHp" class="hp">100 HP</span></div><div class="track"><div id="redFill" class="fill"></div></div></div>
@@ -126,9 +131,8 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <p id="fullscreenStatus" class="fullscreen-status" role="status"></p>
   </dialog>
   <div id="itemStatus" class="item-status" hidden>
-    <button id="useItem" type="button" aria-expanded="false" aria-controls="itemEffect">아이템 없음</button>
+    <button id="useItem" class="item-slot" type="button" aria-label="아이템 없음" aria-expanded="false" aria-controls="itemEffect" disabled></button>
     <p id="itemEffect" class="item-effect" hidden></p>
-    <span id="itemTurn" class="item-turn"></span>
   </div>
   <div id="tutorialIntro" class="tutorial" hidden>
     <div class="tutorial-copy"><strong id="tutorialIntroText" aria-live="polite">이것은 교주의 팽이입니다</strong></div>
@@ -155,7 +159,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
     <ul id="resultChallenges" class="challenge-list" aria-label="도전 과제 결과" hidden></ul>
     <button id="rematch" class="primary">다시하기</button>
   </div>
-  <span class="version">v0.81</span>
+  <span class="version">v0.82</span>
   <div id="fastModeGuide" class="fast-mode-guide" hidden>
     <div class="tutorial-copy">
       <strong>배속 모드를 활성화하면 경로 표시 없이 빠르게 진행할 수 있습니다</strong>
@@ -576,12 +580,15 @@ function updateItemHud() {
   const playerItem = ITEMS[player.item];
   const armed = round.armedItem !== null;
   const expanded = Boolean(playerItem) && round.itemDetailsOpen;
-  useItemButton.textContent = armed ? playerItem.name + ' 사용 예약 · 취소'
+  useItemButton.textContent = playerItem?.name ?? '';
+  const itemLabel = armed ? playerItem.name + ' 사용 예약 취소'
     : playerItem ? playerItem.name + ' 사용' : '아이템 없음';
+  useItemButton.setAttribute('aria-label', itemLabel);
   useItemButton.setAttribute('aria-expanded', String(expanded));
   useItemButton.setAttribute('aria-pressed', String(armed));
   itemEffect.hidden = !expanded;
   itemEffect.textContent = expanded ? playerItem.description : '';
+  itemTurn.hidden = Boolean(tutorial) || !round.started;
   itemTurn.textContent = round.turn + '턴';
 }
 
